@@ -5,3 +5,4 @@ __pycache__/
 p2pchat.egg-info
 build
 dist
+.env
