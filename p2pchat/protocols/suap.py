@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from ..server.db import DB
 
 
 class SUAP_Response:
@@ -14,6 +14,7 @@ class SUAP_Response:
         21: ("CNFLCT", "username already exists in database"),
         22: ("UNKACC", "username wasn't found in database"),
         23: ("INTCPT", "the request seems to be intercepted"),
+        24: ("LGDOUT", "user is not logged in"),
     }
 
     all_codes = {
@@ -28,7 +29,7 @@ class SUAP_Response:
         for code, (str_code_, code_def) in SUAP_Response.all_codes.items():
             if str_code_ == str_code:
                 return code
-        
+
         # Otherwise
         raise NotImplementedError(f"Code {str_code} is not currently supported")
 
@@ -40,79 +41,76 @@ class SUAP_Response:
         alias, description = SUAP_Response.all_codes[code]
 
         return f"{code} {alias} when {description.lower()}"
-    
 
-# Includes database operations
-class DB:
-    # db initializations
-    def __init__(self):
-        self.client = MongoClient('mongodb://localhost:27017/')
-        self.db = self.client['p2p-chat']
+    def __init__(self, code: int, message: str, is_success: bool, data=None) -> None:
+        self.code = code
+        self.message = message
+        self.is_success = is_success
+        self.data = data if isinstance(data, dict) else {}
 
+    @staticmethod
+    def NEWLOG(message: str, data) -> "SUAP_Response":
+        return SUAP_Response(10, message, True, data)
 
-    # checks if an account with the username exists
-    def is_account_exist(self, username):
-        if self.db.accounts.find({'username': username}).count() > 0:
-            return True
-        else:
-            return False
-    
+    @staticmethod
+    def OLDLOG(message: str) -> "SUAP_Response":
+        return SUAP_Response(11, message, True)
 
-    # registers a user
-    def register(self, username, password):
-        account = {
-            "username": username,
-            "password": password
+    @staticmethod
+    def NEWREG(message: str) -> "SUAP_Response":
+        return SUAP_Response(12, message, True)
+
+    @staticmethod
+    def LGDOUT(message: str) -> "SUAP_Response":
+        return SUAP_Response(13, message, True)
+
+    @staticmethod
+    def MSMTCH(message: str) -> "SUAP_Response":
+        return SUAP_Response(20, message, False)
+
+    @staticmethod
+    def CNFLCT(message: str) -> "SUAP_Response":
+        return SUAP_Response(21, message, False)
+
+    @staticmethod
+    def UNKACC(message: str) -> "SUAP_Response":
+        return SUAP_Response(22, message, False)
+
+    @staticmethod
+    def INTCPT(message: str) -> "SUAP_Response":
+        return SUAP_Response(23, message, False)
+
+    def __str__(self) -> str:
+        return f"{self.code} {self.message}"
+
+    def __repr__(self) -> str:
+        return f"<SUAP_Response code={self.code} message={self.message} is_success={self.is_success} data={self.data}>"
+
+    def __dict__(self) -> dict:
+        return {
+            "code": self.code,
+            "message": self.message,
+            "is_success": self.is_success,
+            "data": self.data,
         }
-        self.db.accounts.insert(account)
 
-
-    # retrieves the password for a given username
-    def get_password(self, username):
-        return self.db.accounts.find_one({"username": username})["password"]
-
-
-    # checks if an account with the username online
-    def is_account_online(self, username):
-        if self.db.online_peers.find({"username": username}).count() > 0:
-            return True
-        else:
-            return False
-
-    
-    # logs in the user
-    def user_login(self, username, ip, port):
-        online_peer = {
-            "username": username,
-            "ip": ip,
-            "port": port
-        }
-        self.db.online_peers.insert(online_peer)
-    
-
-    # logs out the user 
-    def user_logout(self, username):
-        self.db.online_peers.remove({"username": username})
-    
-
-    # retrieves the ip address and the port number of the username
-    def get_peer_ip_port(self, username):
-        res = self.db.online_peers.find_one({"username": username})
-        return (res["ip"], res["port"])
+    @staticmethod
+    def init_from_dict(data: dict) -> "SUAP_Response":
+        return SUAP_Response(
+            data["code"], data["message"], data["is_success"], data["data"]
+        )
 
 
 class SUAP_Request:
+    types = {"RGST", "LOGN", "LGDN", "CLRS"}
+
     def __init__(self, connection):
         self.connection = connection
+        self.type = None
 
     def rgst_request(self, username: str, password: str) -> SUAP_Response:
-        f"""Send a RGST (register) request
+        f"""Creates a new user account with the provided username and password.
 
-        Parameters
-        ----------
-        username: str
-
-        
         Returns
         -------
         SUAP_Response
@@ -120,42 +118,159 @@ class SUAP_Request:
                 {SUAP_Response.render_code("NEWREG")}
                 {SUAP_Response.render_code("CNFLCT")}
         """
-        
+        self.type = "RGST"
 
-    # RGST - Register
-    # Syntax: RGST <<username>> <<password>>
-    # Creates a new user account with the provided username and password.
-    # - Returns 12 NEWREG: If the account is successfully created.
-    # - Returns 21 CONFLICT: If the username is already in use.
-    # LOGN - Log In
-    # Syntax: LOGN <<username>> <<password>> <<key>
-    # Attempts to authenticate the user with the provided username and password.
-    # - Returns 10 NEWLOG: If successful.
-    # - Returns 11 OLDLOG: Neglects data entered iff already authenticated.
-    # - Returns 20 INCORRECTCREDS: If the username or password is incorrect.
-    # - Returns 22 UNKNOWNACC: If the username doesn't belong to any account.
-    # LGDN - Logged In
-    # Syntax: LGDN <<username>> <<key>> Terminates the current authenticated session.
-    # - Returns 11 OLDLOG: Already logged in
-    # - Returns 23 INTERCEPT: If the username is logged in but bound to a different address
-    # - Returns 22 UNKNOWNACC: If the username doesn't belong to any account
-    # CLRS - Clear Session (Logout)
-    # Syntax: CLRS <<username>> <<key>> Verifies the current login status of the client.
-    # - Returns 13 LOGGEDOUT: If the log out is successful
-    # - Returns 23 INTERCEPT: If the username is logged in but bound to a different address
-    # - Returns 22 UNKNOWNACC: If the username doesn't belong to any account
-    request_commands = {
-        "RGST"
-    }
+        # Check if account with such username already exists
+        if DB.account_exists(username):
+            return SUAP_Response.CNFLCT(
+                f"Username {username} already exists, please choose another one"
+            )
 
-    def __init__(request):
-        pass
+        # Create an account
+        DB.create_account(username, password)
 
+        # Return a Response object
+        return SUAP_Response.NEWREG(f"Account {username} created successfully")
+
+    def login_request(self, username: str, password: str) -> SUAP_Response:
+        f"""Logs in a user using username and password
+
+        Returns
+        -------
+        SUAP_Response
+            Returns a SUAP_Response with codes:
+                {SUAP_Response.render_code("NEWLOG")}
+                {SUAP_Response.render_code("OLDLOG")}
+                {SUAP_Response.render_code("MSMTCH")}
+                {SUAP_Response.render_code("UNKACC")}
+        """
+        self.type = "LOGN"
+
+        # Check if account with such username exists
+        if not DB.account_exists(username):
+            return SUAP_Response.UNKACC(
+                f"Username {username} doesn't exist, please register first"
+            )
+
+        # Check if the password is correct
+        if not DB.check_password(username, password):
+            return SUAP_Response.MSMTCH(f"Password for {username} is incorrect")
+
+        # Check if the user is already logged in
+        if DB.is_logged_in(username):
+            # Check if the user is logged in from the same address
+            if DB.is_logged_in_from(username, self.connection):
+                return SUAP_Response.OLDLOG(f"User {username} is already logged in")
+
+            # Logout the user from the previous address
+            DB.logout(username)
+
+            # Login the user using the current address
+            DB.login(username, self.connection)
+
+            # Return a Response object
+            return SUAP_Response.NEWLOG(
+                f"User {username} logged in successfully", data=DB_ret
+            )
+
+        # Log in the user
+        DB_ret = DB.login(username)
+
+        # Return a Response object
+        return SUAP_Response.NEWLOG(
+            f"User {username} logged in successfully", data=DB_ret
+        )
+
+    def is_logged_in_request(self, username: str, key: str) -> SUAP_Response:
+        f"""Verifies the current login status of the client.
+
+        Returns
+        -------
+        SUAP_Response
+            Returns a SUAP_Response with codes:
+                {SUAP_Response.render_code("OLDLOG")}
+                {SUAP_Response.render_code("INTCPT")}
+                {SUAP_Response.render_code("UNKACC")}
+        """
+        self.type = "LGDN"
+
+        # Check if account with such username exists
+        if not DB.account_exists(username):
+            return SUAP_Response.UNKACC(
+                f"Username {username} doesn't exist, please register first"
+            )
+
+        # Check if the user is already logged in
+        if DB.is_logged_in(username):
+            # Check if the user is logged in from the same address
+            if DB.is_logged_in_from(username, self.connection):
+                return SUAP_Response.OLDLOG(f"User {username} is logged in")
+
+            # Return a Response object
+            return SUAP_Response.INTCPT(
+                f"User {username} is not logged in from this address"
+            )
+
+        # Return a Response object that user is not logged in
+        return SUAP_Response.LGDOUT(f"User {username} is not logged in")
+
+    def clear_session_request(self, username: str) -> SUAP_Response:
+        f"""Clears the session of the user with the provided username.
+
+        Returns
+        -------
+        SUAP_Response
+            Returns a SUAP_Response with codes:
+                {SUAP_Response.render_code("LGDOUT")}
+                {SUAP_Response.render_code("INTCPT")}
+                {SUAP_Response.render_code("UNKACC")}
+                {SUAP_Response.render_code("LGDOUT")}
+        """
+        self.type = "CLRS"
+
+        # Check if account with such username exists
+        if not DB.account_exists(username):
+            return SUAP_Response.UNKACC(
+                f"Username {username} doesn't exist, please register first"
+            )
+
+        # Check if the user is already logged in
+        if DB.is_logged_in(username):
+            # Check if the user is logged in from the same address
+            if DB.is_logged_in_from(username, self.connection):
+                # Logout the user
+                DB.logout(username)
+
+                # Return a Response object
+                return SUAP_Response.LGDOUT(f"User {username} logged out successfully")
+
+            # Return a Response object
+            return SUAP_Response.INTCPT(
+                f"User {username} is not logged in from this address, please login first"
+            )
+
+        # Return a Response object that user is not logged in
+        return SUAP_Response.LGDOUT(f"User {username} is not logged in")
+
+    def __init__(self, connection):
+        self.connection = connection
+        self.type = None
 
 
 def main():
-    code = SUAP_Response.get_code("INTCPT")
-    print(code)
+    from ..server.connection import Connection
+
+    conn = Connection("localhost", 8000)
+
+    req = SUAP_Request(conn)
+
+    print(req.rgst_request("user", "pass"))
+
+    print(req.login_request("user", "pass"))
+
+    print(req.is_logged_in_request("user", "key"))
+
+    print(req.clear_session_request("user"))
 
 
 if __name__ == "__main__":
