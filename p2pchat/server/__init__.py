@@ -1,3 +1,4 @@
 import sys 
 from pathlib import Path
-sys.path.append(Path.cwd().as_posix())
+#dump but works for now, also use full hirarchy, e.g. p2pchat.protocols.suap
+sys.path.append(Path(__file__).parent.parent.parent.as_posix())
