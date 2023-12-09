@@ -1,6 +1,4 @@
 import __init__ 
-from p2pchat.server.server_db import ServerDB as DB
-
 
 class SUAP_Response:
     success_codes = {
@@ -17,10 +15,13 @@ class SUAP_Response:
         23: ("INTCPT", "the request seems to be intercepted"),
         24: ("LGDOUT", "user is not logged in"),
     }
-
+    error_codes = {
+        30: ("ENTRNL", "internal server error"),
+    }
     all_codes = {
         **success_codes,
         **failure_codes,
+        **error_codes,
     }
 
     @staticmethod
@@ -52,6 +53,10 @@ class SUAP_Response:
     @staticmethod
     def NEWLOG(message: str, data) -> "SUAP_Response":
         return SUAP_Response(10, message, True, data)
+
+    @staticmethod
+    def ENTRNL(message: str, data=None) -> "SUAP_Response":
+        return SUAP_Response(30, message, False, data)
 
     @staticmethod
     def OLDLOG(message: str) -> "SUAP_Response":
@@ -87,7 +92,7 @@ class SUAP_Response:
     def __repr__(self) -> str:
         return f"<SUAP_Response code={self.code} message={self.message} is_success={self.is_success} data={self.data}>"
 
-    def __dict__(self) -> dict:
+    def to_dict(self) -> dict:
         return {
             "code": self.code,
             "message": self.message,
@@ -102,182 +107,32 @@ class SUAP_Response:
         )
 
 
+
+
 """
 I think this class should be responsible for preparing the soap request not handling them
 Moved the functionalities within to the AuthenticationManager class
 """
 class SUAP_Request:
 
+
     types = {"RGST", "LOGN", "LGDN", "CLRS"}
 
     def __init__(self, connection):
         self.connection = connection
         self.type = None
+    @staticmethod
+    def rgst_request( username: str, password: str) -> dict:
+        return {"type": "RGST", "username": username, "password": password}
 
-    def rgst_request(self, username: str, password: str) -> SUAP_Response:
-        f"""Creates a new user account with the provided username and password.
-
-        Returns
-        -------
-        SUAP_Response
-            Returns a SUAP_Response with codes:
-                {SUAP_Response.render_code("NEWREG")}
-                {SUAP_Response.render_code("CNFLCT")}
-        """
-        self.type = "RGST"
-
-        # Check if account with such username already exists
-        if DB.account_exists(username):
-            return SUAP_Response.CNFLCT(
-                f"Username {username} already exists, please choose another one"
-            )
-
-        # Create an account
-        DB.create_account(username, password)
-
-        # Return a Response object
-        return SUAP_Response.NEWREG(f"Account {username} created successfully")
-
-    def login_request(self, username: str, password: str) -> SUAP_Response:
-        f"""Logs in a user using username and password
-
-        Returns
-        -------
-        SUAP_Response
-            Returns a SUAP_Response with codes:
-                {SUAP_Response.render_code("NEWLOG")}
-                {SUAP_Response.render_code("OLDLOG")}
-                {SUAP_Response.render_code("MSMTCH")}
-                {SUAP_Response.render_code("UNKACC")}
-        """
-        self.type = "LOGN"
-
-        # Check if account with such username exists
-        if not DB.account_exists(username):
-            return SUAP_Response.UNKACC(
-                f"Username {username} doesn't exist, please register first"
-            )
-
-        # Check if the password is correct
-        if not DB.check_password(username, password):
-            return SUAP_Response.MSMTCH(f"Password for {username} is incorrect")
-
-        # Check if the user is already logged in
-        if DB.is_logged_in(username):
-            # Check if the user is logged in from the same address
-            if DB.is_logged_in_from(username, self.connection):
-                return SUAP_Response.OLDLOG(f"User {username} is already logged in")
-
-            # Logout the user from the previous address
-            DB.logout(username)
-
-            # Login the user using the current address
-            DB.login(username, self.connection)
-
-            # Return a Response object
-            return SUAP_Response.NEWLOG(
-                f"User {username} logged in successfully", data=DB_ret
-            )
-
-        # Log in the user
-        DB_ret = DB.login(username)
-
-        # Return a Response object
-        return SUAP_Response.NEWLOG(
-            f"User {username} logged in successfully", data=DB_ret
-        )
-
-    def is_logged_in_request(self, username: str, key: str) -> SUAP_Response:
-        f"""Verifies the current login status of the client.
-
-        Returns
-        -------
-        SUAP_Response
-            Returns a SUAP_Response with codes:
-                {SUAP_Response.render_code("OLDLOG")}
-                {SUAP_Response.render_code("INTCPT")}
-                {SUAP_Response.render_code("UNKACC")}
-        """
-        self.type = "LGDN"
-
-        # Check if account with such username exists
-        if not DB.account_exists(username):
-            return SUAP_Response.UNKACC(
-                f"Username {username} doesn't exist, please register first"
-            )
-
-        # Check if the user is already logged in
-        if DB.is_logged_in(username):
-            # Check if the user is logged in from the same address
-            if DB.is_logged_in_from(username, self.connection):
-                return SUAP_Response.OLDLOG(f"User {username} is logged in")
-
-            # Return a Response object
-            return SUAP_Response.INTCPT(
-                f"User {username} is not logged in from this address"
-            )
-
-        # Return a Response object that user is not logged in
-        return SUAP_Response.LGDOUT(f"User {username} is not logged in")
-
-    def clear_session_request(self, username: str) -> SUAP_Response:
-        f"""Clears the session of the user with the provided username.
-
-        Returns
-        -------
-        SUAP_Response
-            Returns a SUAP_Response with codes:
-                {SUAP_Response.render_code("LGDOUT")}
-                {SUAP_Response.render_code("INTCPT")}
-                {SUAP_Response.render_code("UNKACC")}
-                {SUAP_Response.render_code("LGDOUT")}
-        """
-        self.type = "CLRS"
-
-        # Check if account with such username exists
-        if not DB.account_exists(username):
-            return SUAP_Response.UNKACC(
-                f"Username {username} doesn't exist, please register first"
-            )
-
-        # Check if the user is already logged in
-        if DB.is_logged_in(username):
-            # Check if the user is logged in from the same address
-            if DB.is_logged_in_from(username, self.connection):
-                # Logout the user
-                DB.logout(username)
-
-                # Return a Response object
-                return SUAP_Response.LGDOUT(f"User {username} logged out successfully")
-
-            # Return a Response object
-            return SUAP_Response.INTCPT(
-                f"User {username} is not logged in from this address, please login first"
-            )
-
-        # Return a Response object that user is not logged in
-        return SUAP_Response.LGDOUT(f"User {username} is not logged in")
-
-    def __init__(self, connection):
-        self.connection = connection
-        self.type = None
-
-
-def main():
-    from ..server.connection import Connection
-
-    conn = Connection("localhost", 8000)
-
-    req = SUAP_Request(conn)
-
-    print(req.rgst_request("user", "pass"))
-
-    print(req.login_request("user", "pass"))
-
-    print(req.is_logged_in_request("user", "key"))
-
-    print(req.clear_session_request("user"))
-
-
-if __name__ == "__main__":
-    main()
+    @staticmethod
+    def logn_request( username: str, password: str) -> dict:
+        return {"type":"LOGN","username":username,"password":password}
+    
+    @staticmethod
+    def is_logged_in_request( username: str, key: str) -> dict:
+        return {"type":"LGDN","username":username,"key":key}
+    
+    @staticmethod
+    def clear_session_request( username: str,key:str) -> dict:
+        return {"type":"CLRS","username":username,"key":key}
