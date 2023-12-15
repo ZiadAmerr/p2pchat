@@ -37,8 +37,9 @@ from p2pchat.protocols.tcp_request_transceiver import TCPRequestTransceiver
 from p2pchat.protocols.suap import SUAP_Request
 from p2pchat import data
 import logging
+logging.basicConfig(level=logging.DEBUG)
 import time
-
+from p2pchat.custom_logger import app_logger #may use different loggers later
 class KeepAliveThread(threading.Thread):
     """
     thread classs for the HELLO PULSE request, it sends a HELLO (LGDN) message every 20 seconds to the server 
@@ -78,59 +79,83 @@ class KeepAliveThread(threading.Thread):
 class ClientTCPThread():
     """
     Responsible for establishing connections, sending the request,then recieving the response.
+    for not, its a nonpersistent connection, single request/response cycle
     """
+    #TODO: change the name or make it a real thread
     def __init__(self, server_address, server_port):
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_address = server_address
         self.server_port=server_port
-        self.transceiver=TCPRequestTransceiver(self.client_socket)
+        self.transceiver=TCPRequestTransceiver(None)
+    
     def connect(self):
         try:
-            self.client_socket.connect((self.server_address, self.server_port))            
+            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client_socket.connect((self.server_address, self.server_port))     
+            self.transceiver.connection=self.client_socket
+            return True
         except ConnectionRefusedError:
-            print("Connection refused. Server may not be available.")
+            app_logger.warn("Connection refused. Server may not be available.")
         except TimeoutError:
-            print("Connection attempt timed out.")
+            app_logger.warn("Connection attempt timed out.")
         except OSError as e:
-            print("socket is already connected:", e)
+            app_logger.error("socket is already connected:", e)
+            return True
         except Exception as e:
-            print("An error occurred during connection:", e)
-
+            app_logger.error("An error occurred during connection:", e)
+        return False
+    
     def login(self,username,password):
-        self.connect()
+        if not(self.connect()):
+            return {"header":"","body":{"is_success":False,"message":"Connection failed"}}
         self.transceiver.send_message(SUAP_Request.logn_request(username,password))
         response=self.transceiver.recieve_message()
+        self.client_socket.close()
         return response
     
+
     def signup(self,username,password):
-        self.connect()
+        if not(self.connect()):
+            return {"header":"","body":{"is_success":False,"message":"Connection failed"}}
         self.transceiver.send_message(SUAP_Request.rgst_request(username,password))
         response=self.transceiver.recieve_message()
+        self.client_socket.close()
         return response
+
         
 # Example usage
+
 
 class Client:
     def __init__(self):
         self.user=None
         self.client_tcp_thread =ClientTCPThread('127.0.0.1', data.port_tcp)
         self.keep_alive_thread = KeepAliveThread('127.0.0.1',data.port_udp,user=self.user)
-    def login(self,username,password):
+    def login(self,username:str,password:str)->dict:
+        """
+        takes username and password, sends a login request to the server, and returns the response
+        if request is successful, keep alive thread is started, user is returnred in client.user object.
+        response dictionary is returnred as well
+        """
         response=self.client_tcp_thread.login(username,password)
         if response.get("body",{}).get("is_success"):
             self.user=response.get("body").get("data")    
             self.keep_alive_thread.user=self.user
         else:
-            print(f"Failed to login: {response.get('body').get('message')}",response)
-    def signup(self,username,password):
-        response=self.client_tcp_thread.signup(username,password)
-        print (response)
+            print(f"Failed to login: {response.get('body',{}).get('message')}",response)
+        return response
         
+
+    def signup(self,username:str,password:str)->dict:
+        """
+        takes username and password, sends a signup request to the server, and returns the response in {header:"",body:{}} format
+        """
+        return self.client_tcp_thread.signup(username,password)
+    
+
 if __name__=="__main__":
     logging.basicConfig(level=logging.INFO)
     client=Client()
     client.login("test","test")
     print(client.user)
     if(client.user):
-        
         client.keep_alive_thread.start()

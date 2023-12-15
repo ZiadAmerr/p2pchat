@@ -91,19 +91,21 @@ class ServerTCPThread(threading.Thread):
             authentication_manager=AuthenticationManager(socket_address)
             transceiver=TCPRequestTransceiver(client_socket)
             request=transceiver.recieve_message()
-            if request is None:
-                #cleanup
-                client_socket.close()
-                del authentication_manager
-                del transceiver
-                return None
             logging.info(str(request))
             response=authentication_manager.handle_request(request)
             transceiver.send_message(response.to_dict())
+            client_socket.close()
         except Exception as e:
             import traceback 
             traceback.print_exc()
             transceiver.send_message(SUAP_Response.ENTRNL(e).to_dict())
+        finally:
+                client_socket.close()
+                del authentication_manager
+                del transceiver
+                return None
+
+    
     def run(self):
         logging.info(f'TCP server thread started at port {self.port}')
         self.server_socket.listen(1000)
