@@ -40,49 +40,52 @@ from p2pchat.protocols.tcp_request_transceiver import TCPRequestTransceiver
 from p2pchat import data
 from p2pchat.utils.utils import sigint_handler
 from p2pchat.protocols.suap import SUAP_Response
+from p2pchat.custom_logger import logging
+import select
 import logging
-class ServerUDPThread(threading.Thread):
+
+
+class SockerManager():
     def __init__(self, address, port):
-        super().__init__()
         self.address = address
         self.port = port
+        self.server_socket=None
+    def start_socket(self):
+        raise NotImplementedError
+    def handle_request(self):
+        raise NotImplementedError
+class UDPManager(SockerManager):
+    
+        
+    def start_socket(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_socket.bind((self.address, self.port))
-        self.shutdown_flag = threading.Event()
-
-
-    def run(self):
         logging.info(f'UDP server thread started at port {self.port}')
-        while not self.shutdown_flag.is_set():
-            try:
-                request, addr = self.server_socket.recvfrom(1024) #only use for HELLO CALLS
-                request=pickle.loads(request)
-                # Process received request
-                # For example, print received message
-                print(f"Received message from {addr}: {request}")
-                if not validate_request(request.get("body"),["type","username"]):
-                    return print("invalid request")
-                DB.set_last_seen(request.get("body").get("username"))
-            except Exception as e:
-                print("Exception Occued: ",traceback.print_exc(e))
-                return None
+
+    def handle_request(self):
+        """
+        may convert to factory to handle different requests in future
+        """
+        logging.info(f'UDP server thread started at port {self.port}')
+        request, addr = self.server_socket.recvfrom(1024)
+        request=pickle.loads(request)
+
+        logging.debug(f"Received message from {addr}: {request}")
+        if not validate_request(request.get("body"),["type","username"]):
+            return logging.warn("invalid request")
+        DB.set_last_seen(request.get("body").get("username"))
+    
 
 
-    def stop(self):
-        self.shutdown_flag.set()
-        self.server_socket.close()
-
-class ServerTCPThread(threading.Thread):
+class TCPManager(SockerManager):
     """
     a thread thats responsible for auth (for now)
     """
-    def __init__(self, address, port):
-        super().__init__()
-        self.address = address
-        self.port = port
+    def start_socket(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.address, self.port))
-        self.shutdown_flag = threading.Event()
+        self.server_socket.listen(1000)
+        logging.info(f'TCP server thread started at port {self.port}')
 
     def handle_auth_request(client_socket,socket_address):
         #consider using pooling or other non resource-intensive method
@@ -91,7 +94,7 @@ class ServerTCPThread(threading.Thread):
             authentication_manager=AuthenticationManager(socket_address)
             transceiver=TCPRequestTransceiver(client_socket)
             request=transceiver.recieve_message()
-            logging.info(str(request))
+            logging.debug(str(request))
             response=authentication_manager.handle_request(request)
             transceiver.send_message(response.to_dict())
             client_socket.close()
@@ -104,37 +107,32 @@ class ServerTCPThread(threading.Thread):
                 del authentication_manager
                 del transceiver
                 return None
-
-    
-    def run(self):
+  
+    def handle_request(self):
         logging.info(f'TCP server thread started at port {self.port}')
-        self.server_socket.listen(1000)
-        while not self.shutdown_flag.is_set():
-            try:
-                client_socket,address=self.server_socket.accept()
-                logging.info(f'connection from {address} has been established')
-                client_handler=threading.Thread(target=ServerTCPThread.handle_auth_request,args=(client_socket,address))
-                client_handler.start()
-            except Exception as e:
-                print("Exception Occued: ",traceback.print_exc(e))
-                return None
+        try:
+            client_socket,address=self.server_socket.accept()
+            logging.info(f'connection from {address} has been established')
+            client_handler=threading.Thread(target=TCPManager.handle_auth_request,args=(client_socket,address))
+            client_handler.start()
+        except Exception as e:
+            print("Exception Occued: ",traceback.print_exc(e))
+            return None
 
 
-    def stop(self):
-        self.shutdown_flag.set()
-        self.server_socket.close()
-# Example usage
-import signal
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    signal.signal(signal.SIGINT, sigint_handler)
-
-    server_udp_thread = ServerUDPThread('127.0.0.1', data.port_udp)
-    server_tcp_thread =ServerTCPThread('127.0.0.1',data.port_tcp)
-    server_tcp_thread.start()
-    server_udp_thread.start()
-
-    # Perform other operations or run the client here
-
-    # When done, stop the server thread
-    # server_thread.stop()  # Call this when you want to stop the server
+    
+    server_udp_manager= UDPManager('127.0.0.1', data.port_udp)
+    server_tcp_manager= TCPManager('127.0.0.1',data.port_tcp)
+    sockets_managers=[server_tcp_manager,server_udp_manager]
+    managers_socks={}
+    for manager in sockets_managers:
+        manager.start_socket()
+        managers_socks[manager]=manager.server_socket
+    socket_to_manager={v:k for k,v in managers_socks.items()}
+    
+    socks=list(managers_socks.values())
+    while socks:
+        readable,_,_=select.select(socks,[],[])
+        for s in readable:
+            socket_to_manager[s].handle_request()
