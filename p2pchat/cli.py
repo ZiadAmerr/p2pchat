@@ -9,6 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 class App:
     def __init__(self):
         self.client=Client()
+        self.incorrect_attempt = {"incorrect_attempt": 0}
     
     def welcome_state(self):
         print("Welcome to Our chat")
@@ -25,11 +26,11 @@ class App:
 
 
     def login_state(self):
-        if "incorrect_attempt" in self.state_data and self.state_data["incorrect_attempt"] >= 3:
+        if "incorrect_attempt" in self.incorrect_attempt and self.incorrect_attempt["incorrect_attempt"] >= 3:
             print("Account locked. Try again in 1 minute.")
             return None
 
-        if "incorrect_attempt" in self.state_data and self.state_data["incorrect_attempt"]:
+        if "incorrect_attempt" in self.incorrect_attempt and self.incorrect_attempt["incorrect_attempt"]:
             print("Incorrect username or password")
             print()
 
@@ -43,12 +44,10 @@ class App:
         response=self.client.login(username, password)
         app_logger.debug(response)
         if response.get("body").get("is_success") == True:
-            self.state_data["incorrect_attempt"] = 0
-            self.state_data["user"]["username"] = username  # Store username in self.state_data
-            self.state_data["user"]["id"] = self.state_data["users"][username]["id"]  # Store user ID in self.state_data
+            self.incorrect_attempt["incorrect_attempt"] = 0
             return "Main Menu"
         else:
-            self.state_data["incorrect_attempt"] = self.state_data.get("incorrect_attempt", 0) + 1
+            self.incorrect_attempt["incorrect_attempt"] = self.incorrect_attempt.get("incorrect_attempt", 0) + 1
             return "Login"
 
 
@@ -228,9 +227,7 @@ class App:
 
     def main(self):
         state = "Welcome"
-
         while True:
-            choice = None
             if state == "Welcome":
                 next_state = self.welcome_state()
             elif state == "Login":
@@ -256,7 +253,7 @@ class App:
             elif next_state is None:
                 app_logger.debug("next_state is None")
                 time.sleep(60)
-                self.state_data["incorrect_attempt"] = 0
+                self.incorrect_attempt["incorrect_attempt"] = 0
                 next_state = "Login"
 
             state = next_state
@@ -265,5 +262,3 @@ class App:
 if __name__ == "__main__":
     my_app= App()
     my_app.main()
-
-
