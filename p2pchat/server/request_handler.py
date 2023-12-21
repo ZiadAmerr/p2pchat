@@ -58,9 +58,9 @@ class LoginRequestHandler(RequestHandler):
             return SUAP_Response.MSMTCH(f"Invalid username or password")
 
         # Check if the user is already logged in
-        user=DB.find('users',{'is_active':1,'username':username})
-        if len(user):
-            user=user[0]
+        user_logged_in=DB.find('users',{'is_active':1,'username':username})
+        if len(user_logged_in):
+            user=user_logged_in[0]
             # Check if the user is logged in from the same address
             if user.get('ip')==connection_address[0]:
                 return SUAP_Response.OLDLOG(f"User {username} is already logged in")

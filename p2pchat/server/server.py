@@ -38,7 +38,6 @@ from p2pchat.server.server_db import myDB as DB
 from p2pchat.server.authentication_manager import AuthenticationManager
 from p2pchat.protocols.tcp_request_transceiver import TCPRequestTransceiver
 from p2pchat import data
-from p2pchat.utils.utils import sigint_handler
 from p2pchat.protocols.suap import SUAP_Response
 from p2pchat.custom_logger import logging
 import select
@@ -107,9 +106,8 @@ class TCPManager(SockerManager):
                 del authentication_manager
                 del transceiver
                 return None
-  
+
     def handle_request(self):
-        logging.info(f'TCP server thread started at port {self.port}')
         try:
             client_socket,address=self.server_socket.accept()
             logging.info(f'connection from {address} has been established')

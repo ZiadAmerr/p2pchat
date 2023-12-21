@@ -1,7 +1,6 @@
 import datetime
 import time 
 import uuid
-import sys
 def get_timesamp():
     """ unix timestamp"""
     return time.mktime(datetime.datetime.now().timetuple())
@@ -24,7 +23,3 @@ def dict_factory(cursor, row):
     for idx, col in enumerate(cursor.description):
         d[col[0]] = row[idx]
     return d
-
-def sigint_handler(signal, frame):
-    print("\nCtrl+C detected. Closing the socket and exiting.")
-    sys.exit(0)

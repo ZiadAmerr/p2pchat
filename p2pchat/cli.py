@@ -209,19 +209,11 @@ class App:
         return "Main Menu"
 
     def exit_state(self):
+        self.client.logout()
+        print("Goodbye!")
         return "Welcome"
 
-# chat_history = []
-# self.state_data = {
-#     "incorrect_attempt": 0,
-#     "users": {
-#         "hanna": {"username": "hanna", "password": "123456", "id": "112233"},
-#         "ziad": {"username": "ziad", "password": "456789", "id": "332211"}
-#     },
-#     "user": {}  
-# }
-# usernames = set(state_data["users"].keys())
-# state_data['user']['chat_history'] = {}
+
 
 
 

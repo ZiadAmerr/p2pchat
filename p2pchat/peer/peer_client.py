@@ -74,7 +74,6 @@ class KeepAliveThread(threading.Thread):
 
     def stop(self):
         self.shutdown_flag.set()
-        self.server_socket.close()
 
 class ClientTCPThread():
     """
@@ -94,9 +93,9 @@ class ClientTCPThread():
             self.transceiver.connection=self.client_socket
             return True
         except ConnectionRefusedError:
-            app_logger.warn("Connection refused. Server may not be available.")
+            app_logger.warning("Connection refused. Server may not be available.")
         except TimeoutError:
-            app_logger.warn("Connection attempt timed out.")
+            app_logger.warning("Connection attempt timed out.")
         except OSError as e:
             app_logger.error("socket is already connected:", e)
             return True
@@ -120,7 +119,13 @@ class ClientTCPThread():
         response=self.transceiver.recieve_message()
         self.client_socket.close()
         return response
-
+    def logout(self,username):
+        if not(self.connect()):
+            return {"header":"","body":{"is_success":False,"message":"Connection failed"}}
+        self.transceiver.send_message(SUAP_Request.clear_session_request(username,'whatever'))
+        response=self.transceiver.recieve_message()
+        self.client_socket.close()
+        return response
         
 # Example usage
 
@@ -140,8 +145,9 @@ class Client:
         if response.get("body",{}).get("is_success"):
             self.user=response.get("body").get("data")    
             self.keep_alive_thread.user=self.user
+            self.keep_alive_thread.start()
         else:
-            print(f"Failed to login: {response.get('body',{}).get('message')}",response)
+            print(f"Failed to login: {response.get('body',{}).get('message')}")
         return response
         
 
@@ -151,6 +157,12 @@ class Client:
         """
         return self.client_tcp_thread.signup(username,password)
     
+    def logout(self):
+        """
+        sends a logout request to the server, and returns the response in {header:"",body:{}} format
+        """
+        self.client_tcp_thread.logout(self.user.get("username"))
+        self.keep_alive_thread.stop()
 
 if __name__=="__main__":
     logging.basicConfig(level=logging.INFO)
