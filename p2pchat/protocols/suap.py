@@ -1,4 +1,5 @@
-import __init__ 
+import __init__
+
 
 class SUAP_Response:
     success_codes = {
@@ -107,32 +108,31 @@ class SUAP_Response:
         )
 
 
-
-
 """
 I think this class should be responsible for preparing the soap request not handling them
 Moved the functionalities within to the AuthenticationManager class
 """
+
+
 class SUAP_Request:
-
-
     types = {"RGST", "LOGN", "LGDN", "CLRS"}
 
     def __init__(self, connection):
         self.connection = connection
         self.type = None
+
     @staticmethod
-    def rgst_request( username: str, password: str) -> dict:
+    def rgst_request(username: str, password: str) -> dict:
         return {"type": "RGST", "username": username, "password": password}
 
     @staticmethod
-    def logn_request( username: str, password: str) -> dict:
-        return {"type":"LOGN","username":username,"password":password}
-    
+    def logn_request(username: str, password: str) -> dict:
+        return {"type": "LOGN", "username": username, "password": password}
+
     @staticmethod
-    def is_logged_in_request( username: str, key: str) -> dict:
-        return {"type":"LGDN","username":username,"key":key}
-    
+    def is_logged_in_request(username: str, key: str) -> dict:
+        return {"type": "LGDN", "username": username, "key": key}
+
     @staticmethod
-    def clear_session_request( username: str,key:str) -> dict:
-        return {"type":"CLRS","username":username,"key":key}
+    def clear_session_request(username: str, key: str) -> dict:
+        return {"type": "CLRS", "username": username, "key": key}
