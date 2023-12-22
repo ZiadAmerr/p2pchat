@@ -4,8 +4,8 @@ from p2pchat.server.request_handler import *
 from p2pchat.server.server_db import myDB as DB
 from p2pchat.utils import utils
 
-class AuthenticationManager:
 
+class AuthenticationManager:
 
     """
     Handles the authentication-related requests from the clients.
@@ -24,41 +24,58 @@ class AuthenticationManager:
     requset: dict in the form of {header:<headerinfo>,data:{type:<request_type>,username:<username>,...}}
     connection_address: atuple of (host,port), can be aquired from the socket, check server_playground
     future note: we might move the request type to the header
-        """
+    """
+
     types = {"RGST", "LOGN", "LGDN", "CLRS"}
 
     def __init__(self, connection_address):
-        self.connection_address=connection_address
+        self.connection_address = connection_address
         self.type = None
-        
-    def handle_request(self,request)->SUAP_Response:
+
+    def handle_request(self, request) -> SUAP_Response:
         """
         parses the recieved request and handle it accordingly
         """
-        if(not request.get('body',{}).get('type')):
+        if not request.get("body", {}).get("type"):
             raise Exception("handle_request: Invalid Request")
-        request_handler=AuthenticationManager._handler_factory(request.get('body').get('type'))
-        return request_handler.handle_request(self.connection_address,request)
+        request_handler = AuthenticationManager._handler_factory(
+            request.get("body").get("type")
+        )
+        return request_handler.handle_request(self.connection_address, request)
 
-
-    def _handler_factory(request_type)->RequestHandler:
-        handlers={
-        "RGST":RegisterationRequestHandler,
-        "LOGN":LoginRequestHandler,
-        "LGDN":IsLoggedRequestHandler,
-        "CLRS":ClearSessionRequestHandler
+    def _handler_factory(request_type) -> RequestHandler:
+        handlers = {
+            "RGST": RegisterationRequestHandler,
+            "LOGN": LoginRequestHandler,
+            "LGDN": IsLoggedRequestHandler,
+            "CLRS": ClearSessionRequestHandler,
         }
         if request_type in handlers:
             return handlers.get(request_type)
         raise Exception("Request Type not supproted")
 
-    
 
 if __name__ == "__main__":
-    AM=AuthenticationManager(("localhost", 8000))
-    print(AM.handle_request({"header":"","data":{"type": "RGST", "username": "user", "password": "pass"}}))
-    print(AM.handle_request({"header":"","data":{"type": "LOGN", "username": "user", "password": "pass"}}))
-    print(AM.handle_request({"header":"","data":{"type": "LGDN", "username": "user"}}))
-    print(AM.handle_request({"header":"","data":{"type": "CLRS", "username": "user"}}))
-
-   
+    AM = AuthenticationManager(("localhost", 8000))
+    print(
+        AM.handle_request(
+            {
+                "header": "",
+                "data": {"type": "RGST", "username": "user", "password": "pass"},
+            }
+        )
+    )
+    print(
+        AM.handle_request(
+            {
+                "header": "",
+                "data": {"type": "LOGN", "username": "user", "password": "pass"},
+            }
+        )
+    )
+    print(
+        AM.handle_request({"header": "", "data": {"type": "LGDN", "username": "user"}})
+    )
+    print(
+        AM.handle_request({"header": "", "data": {"type": "CLRS", "username": "user"}})
+    )
