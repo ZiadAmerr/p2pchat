@@ -24,7 +24,7 @@ class UDPClientThread(Thread):
         self.ip = ip
         self.port = port
         self.tcp_client_socket = tcp_client_socket
-        
+
         self.username = None
         self.is_online = True
         self.udp_server = None
@@ -190,7 +190,9 @@ class UDPClientThread(Thread):
                         # and sends the related response to peer
                         if db.is_account_online(message[1]):
                             peer_info = db.get_peer_ip_port(message[1])
-                            response = "search-success " + peer_info[0] + ":" + peer_info[1]
+                            response = (
+                                "search-success " + peer_info[0] + ":" + peer_info[1]
+                            )
                             logging.info(
                                 "Send to "
                                 + self.ip
