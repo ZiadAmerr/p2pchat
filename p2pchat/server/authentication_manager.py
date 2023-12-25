@@ -43,12 +43,14 @@ class AuthenticationManager:
         )
         return request_handler.handle_request(self.connection_address, request)
 
-    def _handler_factory(request_type) -> RequestHandler:
-        handlers = {
-            "RGST": RegisterationRequestHandler,
-            "LOGN": LoginRequestHandler,
-            "LGDN": IsLoggedRequestHandler,
-            "CLRS": ClearSessionRequestHandler,
+
+    def _handler_factory(request_type)->RequestHandler:
+        handlers={
+        "RGST":RegisterationRequestHandler,
+        "LOGN":LoginRequestHandler,
+        "LGDN":IsLoggedRequestHandler,
+        "CLRS":ClearSessionRequestHandler,
+        "GTOP":GetOnlinePeersHandler,
         }
         if request_type in handlers:
             return handlers.get(request_type)

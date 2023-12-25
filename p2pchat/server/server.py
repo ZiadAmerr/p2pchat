@@ -42,6 +42,7 @@ from p2pchat.protocols.suap import SUAP_Response
 from p2pchat.custom_logger import logging
 import select
 import logging
+from p2pchat.server.monitor import UsersMonitor
 
 
 class SockerManager():
@@ -65,17 +66,18 @@ class UDPManager(SockerManager):
         """
         may convert to factory to handle different requests in future
         """
-        logging.info(f'UDP server thread started at port {self.port}')
         request, addr = self.server_socket.recvfrom(1024)
         request=pickle.loads(request)
 
         logging.debug(f"Received message from {addr}: {request}")
         if not validate_request(request.get("body"),["type","username"]):
             return logging.warn("invalid request")
-        DB.set_last_seen(request.get("body").get("username"))
+        try:
+            DB.set_last_seen(request.get("body").get("username"))
+        except Exception as e:
+            logging.error(f"error while setting last seen for {request.get('body').get('username')}: {e}")
+            return None
     
-
-
 class TCPManager(SockerManager):
     """
     a thread thats responsible for auth (for now)
@@ -93,7 +95,6 @@ class TCPManager(SockerManager):
             authentication_manager=AuthenticationManager(socket_address)
             transceiver=TCPRequestTransceiver(client_socket)
             request=transceiver.recieve_message()
-            logging.debug(str(request))
             response=authentication_manager.handle_request(request)
             transceiver.send_message(response.to_dict())
             client_socket.close()
@@ -122,6 +123,8 @@ if __name__ == "__main__":
     
     server_udp_manager= UDPManager('127.0.0.1', data.port_udp)
     server_tcp_manager= TCPManager('127.0.0.1',data.port_tcp)
+    clients_montior=UsersMonitor()
+    clients_montior.start()
     sockets_managers=[server_tcp_manager,server_udp_manager]
     managers_socks={}
     for manager in sockets_managers:

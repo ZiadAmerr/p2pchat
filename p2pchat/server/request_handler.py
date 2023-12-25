@@ -42,10 +42,11 @@ class LoginRequestHandler(RequestHandler):
                 {SUAP_Response.render_code("MSMTCH")}
                 {SUAP_Response.render_code("UNKACC")}
         """
-        if(not utils.validate_request(request['body'],["username","password"])):
+        if(not utils.validate_request(request['body'],["username","password","tcp_port"])):
             raise ValueError ("Invalid Request, Login must have username and password")
         username=request.get('body').get('username')
         password=request.get('body').get('password')
+        tcp_port=request.get('body').get('tcp_port')
         # Check if account with such username exists
         user = DB.find('users', {'username': username})
         if not len(user):
@@ -60,16 +61,18 @@ class LoginRequestHandler(RequestHandler):
         # Check if the user is already logged in
         user_logged_in=DB.find('users',{'is_active':1,'username':username})
         if len(user_logged_in):
+
             user=user_logged_in[0]
             # Check if the user is logged in from the same address
-            if user.get('ip')==connection_address[0]:
-                return SUAP_Response.OLDLOG(f"User {username} is already logged in")
+            if user.get('IP')==connection_address[0]:
+                return SUAP_Response.CNFLCT(f"User {username} is already logged in")
 
             # Logout the user from the previous address
             DB.logout(username)
 
             # Login the user using the current address
-            DB.login(username, connection_address[0])
+            DB.login(username, connection_address[0],tcp_port)
+            user={**user,'IP':connection_address[0],'PORT':tcp_port,'is_active':1}
 
             # Return a Response object  
 
@@ -78,7 +81,8 @@ class LoginRequestHandler(RequestHandler):
             )
 
         # Log in the user
-        DB_ret = DB.login(username,connection_address[0])
+        DB.login(username,connection_address[0],tcp_port)
+        user={**user,'IP':connection_address[0],'PORT':tcp_port,'is_active':1}
 
         # Return a Response object
         return SUAP_Response.NEWLOG(
@@ -127,6 +131,7 @@ class IsLoggedRequestHandler(RequestHandler):
         return SUAP_Response.LGDOUT(f"User {username} is not logged in")
 
 class ClearSessionRequestHandler(RequestHandler):
+    @staticmethod
     def handle_request(connection_address,request):
         f"""Clears the session of the user with the provided username.
 
@@ -167,3 +172,15 @@ class ClearSessionRequestHandler(RequestHandler):
 
         # Return a Response object that user is not logged in
         return SUAP_Response.LGDOUT(f"User {username} is not logged in")
+    
+class GetOnlinePeersHandler(RequestHandler):
+    @staticmethod
+    def handle_request(connection_address,request):
+        if(not utils.validate_request(request['body'],["username"])):
+            raise ValueError ("Invalid Request, getting online peers requires a username")
+        users=DB.find('users',{'is_active':1})
+        for user in users:
+            user.pop('password')
+            if user['username']==request['body']['username']:
+                users.remove(user)
+        return SUAP_Response.NEWLOG(f"Online users ",data={"users":users})

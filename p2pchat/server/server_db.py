@@ -4,10 +4,9 @@ import datetime
 from pathlib import Path
 from p2pchat.utils import utils
 import logging
-
-logging.basicConfig(level=logging.DEBUG)
-
-
+import threading
+logging.basicConfig(level=logging.INFO)
+# Decorator function to apply color to text
 class ServerDB:
     """
     a class that contains all the server database related functions
@@ -30,21 +29,20 @@ class ServerDB:
             password TEXT NOT NULL,
             is_active INTEGER NOT NULL DEFAULT 0, 
             last_seen REAL NOT NULL DEFAULT 0,
-            IP TEXT UNIQUE,
-            created_at REAL NOT NULL
+            IP TEXT,
+            PORT INTEGER,
+            created_at REAL NOT NULL,
+            UNIQUE(IP,PORT)
         );
         """
         )
         self.connection.commit()
 
-    def login(self, username, ip):
+    def login(self,username,ip,port):
         """
         sets a user status to active and updates their ip
         """
-        res = self.cursor.execute(
-            "UPDATE users SET is_active = 1, IP = ? WHERE username = ?;", (ip, username)
-        )
-        self.set_last_seen(username)  # may merge both steps later
+        res=self.cursor.execute(f"UPDATE users SET is_active = 1, IP = ?,PORT = ?, last_seen = {utils.get_timesamp()} WHERE username = ?;",(ip,port,username))        
         self.connection.commit()
         return res
 
@@ -53,10 +51,12 @@ class ServerDB:
         sets a user status to inactive
         """
 
-        self.cursor.execute(
-            f"UPDATE users SET is_active = 0 WHERE username = '{username}';",
-        )
-        self.connection.commit()
+        try:
+            self.cursor.execute(
+                f"UPDATE users SET is_active = 0 WHERE username = '{username}';",
+            )
+        finally:
+            self.connection.commit()
 
     def register_user(self, username, password):
         try:
@@ -86,6 +86,7 @@ class ServerDB:
         """
         table_attrs = self.get_table_columns(table_name)
         valid_attrs = [attr for attr in attrs.keys() if attr in table_attrs]
+        valid_vals = [attrs[attr] for attr in valid_attrs]
         if len(valid_attrs) == 0 and len(attrs):
             logging.debug(
                 f"Invalid attrs provided, valid table attrs are: {table_attrs}"
@@ -94,7 +95,7 @@ class ServerDB:
 
         conditions = " AND ".join([f"{valid_attr}=?" for valid_attr in valid_attrs])
         query = f"SELECT * FROM {table_name} WHERE {conditions};"
-        self.cursor.execute(query, tuple(attrs.values()))
+        self.cursor.execute(query, tuple(valid_vals))
         return self.cursor.fetchall()
 
     def get_table_columns(self, table_name):
