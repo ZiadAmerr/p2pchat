@@ -1,6 +1,8 @@
 import datetime
 import time 
 import uuid
+import os 
+
 def get_timesamp():
     """ unix timestamp"""
     return time.mktime(datetime.datetime.now().timetuple())
@@ -23,3 +25,7 @@ def dict_factory(cursor, row):
     for idx, col in enumerate(cursor.description):
         d[col[0]] = row[idx]
     return d
+
+def clear_console():
+    # Clear console screen
+    os.system('cls' if os.name == 'nt' else 'clear')

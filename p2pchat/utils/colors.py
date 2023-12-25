@@ -31,7 +31,7 @@ def yellow_text(text):
 
 @color_text(Colors.BLUE)
 def blue_text(text):
-    return 
+    return text
 
 @color_text(Colors.MAGENTA)
 def magenta_text(text):
