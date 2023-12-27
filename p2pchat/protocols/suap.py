@@ -126,8 +126,8 @@ class SUAP_Request:
         return {"type": "RGST", "username": username, "password": password}
 
     @staticmethod
-    def logn_request( username: str, password: str,port:int) -> dict:
-        return {"type":"LOGN","username":username,"password":password,"tcp_port":port}
+    def logn_request( username: str, password: str,port_tcp:int,port_udp:int) -> dict:
+        return {"type":"LOGN","username":username,"password":password,"tcp_port":port_tcp,"udp_port":port_udp}
     
     @staticmethod
     def is_logged_in_request(username: str, key: str) -> dict:
