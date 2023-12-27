@@ -1,7 +1,7 @@
 import __init__
 from p2pchat.peer.peer_client import *
 from p2pchat.peer.peer_server import *
-
+from tabulate import tabulate
 import time
 import uuid  # Import the UUID module
 from p2pchat.custom_logger import app_logger
@@ -9,7 +9,7 @@ import logging
 from p2pchat.utils.colors import *
 from p2pchat.utils.utils import clear_console
 from p2pchat.utils.chat_histoty import history,print_and_remember
-from p2pchat.globals import not_chatting
+from p2pchat.globals import not_chatting,ignore_input
 logging.basicConfig(level=logging.INFO)
 
 class App:
@@ -17,6 +17,7 @@ class App:
         self.client_auth=ClientAuth()
         self.incorrect_attempt = {"incorrect_attempt": 0}
         self.active_peers=[]
+        self.client_auth.available_rooms=[]
         self.peer_server=PeerServer()
         self.peer_client=PeerClient()
 
@@ -62,7 +63,6 @@ class App:
             self.incorrect_attempt["incorrect_attempt"] = self.incorrect_attempt.get("incorrect_attempt", 0) + 1
             return "Login"
 
-
     def signup_state(self):
         #email = input("Email: ")
         username = input("Username: ")
@@ -88,26 +88,29 @@ class App:
 
     def menu_state(self):
         print("Main Menu")
-        print("1. Show your profile")
-        print("2. Show others' profiles")
-        print("3. Send a private message")
-        print("4. Join Available Rooms")
+        print("1. Create room")
+        print("2. List available rooms")
+        print("3. Enter chatroom")
+        print("4. Join Room")
         print("5. List online users")
-        print("6. Exit")
+        print("6. Send a private message")
+        print("7. Exit")
         
 
         choice = input("Please enter your choice: ")
         if choice == "1":
-            return "show your profile"
+            return "create room"
         elif choice =="2":
-            return "show others' profile"
+            return "list rooms"
         elif choice =="3":
-            return "send msg"
+            return "Enter chatroom"
         elif choice == "4":
-            return "join"
+            return "Join Room"
         elif choice =="5":
-            return "list"
+            return "list users"
         elif choice =="6":
+            return "Send a private message"
+        elif choice =="7":
             return "exit"
         else:
             return "Main Menu"
@@ -144,20 +147,27 @@ class App:
                 print("Please sign up to create your profile.")
 
         return "Main Menu"
-    #YAGNI
-    def show_others_profile_state(self):
-        print("Show Others' Profile")
+    
+    def create_chatroom_state(self):
+        print("Create a chatroom")
+        room_name = input("Enter the name of the chatroom: ")
+        res=self.client_auth.create_chatroom(room_name)
 
-        profile_username = input("Enter the username of the profile you want to view: ")
-        if profile_username in usernames:
-            print(f"Profile of {profile_username}:")
-            print(f"Username: {self.state_data['users'][profile_username]['username']}")
-            print(f"ID: {self.state_data['users'][profile_username]['id']}")
+        return "Main Menu"
+    
+    def list_rooms_state(self):
+        print("List available rooms")
+        self.client_auth.available_rooms = self.client_auth.get_chatrooms()
+        if len(self.client_auth.available_rooms):
+            headers=[bold_text(i) for i in["ROOM KEY","OWNER","OWNER STATUS"]]
+            data=[]
+            for room in self.client_auth.available_rooms:
+                status= yellow_text('you') if room['owner']==self.client_auth.user['username'] else green_text('Available') if room['is_active'] else red_text('Not Available') #iknow...
+                data.append ([room['key'],room['owner'],status])
+            print(tabulate(data,headers=headers,tablefmt="pretty"))
         else:
-            print(f"User with username {profile_username} not found.")
-
-
-
+            print("No rooms available.")
+       
         return "Main Menu"
 
     def send_msg_state(self):
@@ -183,38 +193,35 @@ class App:
         return "Main Menu"
 
     def join_room_state(self):
-        available_rooms = ["General", "Sports", " politics"]
+        print ("Join a room")
+        chat_room=input("Enter Chatroom key: ")
 
-        print("Available Rooms:")
-        for i, room_name in enumerate(available_rooms, start=1):
-            print(f"{i}. {room_name}")
+        if chat_room not in [room["key"] for room in self.client_auth.available_rooms] :
+            self.client_auth.available_rooms=self.client_auth.get_chatrooms()
 
-        choice = int(input("Enter the number of the room you want to join: "))
+        if chat_room not in [room["key"] for room in self.client_auth.available_rooms] :
+            print("Room with key doesn't exist")
+            return "Main Menu"
 
-        try:
-            if not 1 <= choice <= len(available_rooms):
-                print("Invalid room number. Please try again.")
-                return "Main Menu"
-        except ValueError:
-            print("Invalid input. Please enter a number.")
+        room=next(room for room in self.client_auth.available_rooms if room["key"]==chat_room)
+        if not room['is_active']:
+            print(red_text("Room owner is offline"))
+            return "Main Menu"
+        response=self.peer_client.join_chatroom(room)
+        
+        return "Main Menu"
+   
+    def enter_chatroom_state(self):
+        print("Enter a chatroom")
+        chatroom_key = input("Enter the name of the chatroom: ")
+        if chatroom_key not in [room["key"] for room in self.client_auth.available_rooms] :
+            self.client_auth.get_chatrooms()
+
+        if chatroom_key not in [room["key"] for room in self.client_auth.available_rooms] :
+            print(red_text("Chatroom not found."))
             return "Main Menu"
         
-        joined_room = available_rooms[choice - 1]
-        print(f"You have successfully joined the '{joined_room}' room.")
-
-        while True: 
-            user_input = input("Use SEND to send a message or EXIT to leave the room: ").strip().upper()
-
-            if user_input.startswith("SEND"):
-                choice = input("Enter your message:")
-                print(f"Your message has been sent.")
-
-            elif user_input == "EXIT":
-                print(f"You have left the '{joined_room}' room.")
-                break
-            else:
-                print("Invalid input. Please try again.")
-
+        self.peer_client.enter_chatroom(chatroom_key)
         return "Main Menu"
 
     def list_state(self):
@@ -241,6 +248,9 @@ class App:
         state = "Welcome"
         while True:
             not_chatting.wait()
+            if (ignore_input.is_set()):
+                time.sleep(1)
+                continue
             if state == "Welcome":
                 next_state = self.welcome_state()
             elif state == "Login":
@@ -249,18 +259,20 @@ class App:
                 next_state = self.signup_state()
             elif state == "Main Menu":
                 next_state= self.menu_state()
-                if next_state == "show your profile":
-                    next_state = self.show_your_profile_state()
-                elif next_state == "show others' profile":
-                    next_state = self.show_others_profile_state()
+                if next_state == "create room":
+                    next_state = self.create_chatroom_state()
+                elif next_state == "list rooms":
+                    next_state = self.list_rooms_state()
                 elif next_state == "send msg":
                     next_state= self.send_msg_state()
-                elif next_state =="join":
+                elif next_state =="Join Room":
                     next_state= self.join_room_state()
-                elif next_state =="list":
+                elif next_state =="list users":
                     next_state= self.list_state()
                 elif next_state =="exit":
                     next_state= self.exit_state()
+                elif next_state =="Enter chatroom":
+                    next_state= self.enter_chatroom_state()
             elif next_state is None:
                 if self.client_auth.user is not None:
                     next_state="Main Menu"
@@ -273,7 +285,7 @@ class App:
 
 
 if __name__ == "__main__":
-    my_app= App()
-    my_app.main()
-    
+    while True:
+        my_app= App()
+        my_app.main()
     
