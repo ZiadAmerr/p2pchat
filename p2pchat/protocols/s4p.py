@@ -209,14 +209,7 @@ class S4P_Request:
             "username": username,
         }
 
-    @staticmethod
-    def privrm_request(sender,recipient):
-        return {
-            "type": "PRIVRM",
-            "sender": sender,
-            "recipient": recipient,
-        }
-
+ 
     @staticmethod
     def rmctrl_request(
         kind: str, auth: str, room_id: str = None, room_name: str = None
@@ -244,6 +237,33 @@ class S4P_Request:
             raise ValueError(f"Unknown kind {kind}")
     
     @staticmethod
+    def privrm_request(sender,recipient):
+        """p2p protocol"""
+        return {
+            "type": "PRIVRM",
+            "sender": sender,
+            "recipient": recipient,
+        }
+
+    @staticmethod
+    def gtrm_request(sender,chatroom_key):
+        """p2p protocol"""
+        return {
+            "type":"GTRM",
+            "caller":sender,
+            "chatroom_key":chatroom_key
+        }
+    
+    @staticmethod
+    def joinrm_request(sender,chatroom_key):
+        """p2p protocol"""
+        return {
+            "type":"JOINRM",
+            "sender":sender,
+            "chatroom_key":chatroom_key
+        }
+    
+    @staticmethod
     def sndmsg_smpl_request(message,key,sender,recepient=None):
         return {
                 "type": "SNDMSG",
@@ -252,6 +272,7 @@ class S4P_Request:
                 "recipient": recepient,
                 "sender":sender
         }
+
     @staticmethod
     def sndmsg_request(message: str,auth: str,type_: str,recipient: str = None,room_id: str = None):
         if type_ == "PRIVRCP":
