@@ -1,5 +1,6 @@
 import bcrypt
 from p2pchat.protocols.suap import SUAP_Response
+from p2pchat.protocols.s4p import S4P_Response
 from p2pchat.server.server_db import myDB as DB
 from p2pchat.utils import utils
 
@@ -7,6 +8,7 @@ class RequestHandler:
     """
     class that is responsible for handling an incoming (SAUP) requests
     """
+    
     @staticmethod
     def handle_request(connection_address,request)->SUAP_Response:
         raise NotImplementedError
@@ -42,11 +44,12 @@ class LoginRequestHandler(RequestHandler):
                 {SUAP_Response.render_code("MSMTCH")}
                 {SUAP_Response.render_code("UNKACC")}
         """
-        if(not utils.validate_request(request['body'],["username","password","tcp_port"])):
+        if(not utils.validate_request(request['body'],["username","password","tcp_port",'udp_port'])):
             raise ValueError ("Invalid Request, Login must have username and password")
         username=request.get('body').get('username')
         password=request.get('body').get('password')
         tcp_port=request.get('body').get('tcp_port')
+        udp_port=request.get('body').get('udp_port')
         # Check if account with such username exists
         user = DB.find('users', {'username': username})
         if not len(user):
@@ -71,8 +74,8 @@ class LoginRequestHandler(RequestHandler):
             DB.logout(username)
 
             # Login the user using the current address
-            DB.login(username, connection_address[0],tcp_port)
-            user={**user,'IP':connection_address[0],'PORT':tcp_port,'is_active':1}
+            DB.login(username, connection_address[0],tcp_port,udp_port)
+            user={**user,'IP':connection_address[0],'PORT':tcp_port,'PORT_UDP':udp_port,'is_active':1}
 
             # Return a Response object  
 
@@ -81,8 +84,8 @@ class LoginRequestHandler(RequestHandler):
             )
 
         # Log in the user
-        DB.login(username,connection_address[0],tcp_port)
-        user={**user,'IP':connection_address[0],'PORT':tcp_port,'is_active':1}
+        DB.login(username,connection_address[0],tcp_port,udp_port)
+        user={**user,'IP':connection_address[0],'PORT':tcp_port,'PORT_UDP':udp_port,'is_active':1}
 
         # Return a Response object
         return SUAP_Response.NEWLOG(
@@ -184,3 +187,71 @@ class GetOnlinePeersHandler(RequestHandler):
             if user['username']==request['body']['username']:
                 users.remove(user)
         return SUAP_Response.NEWLOG(f"Online users ",data={"users":users})
+    
+class CreateRoomRequestHandler(RequestHandler):
+    @staticmethod
+    def handle_request(connection_address,request):
+        if(not utils.validate_request(request['body'],["user","chatroom_key"])):
+            raise ValueError ("Invalid Request, creating a room requires a user to be signed id")
+        try:
+            res=DB.create_chatroom(request['body']['chatroom_key'],request['body']['user']['_id'])
+        except Exception as e:
+            return S4P_Response.ISIDLERM(f"Couldn't create room: {e}")
+
+        return S4P_Response.CREATDRM(f"Room was created successfully",data={"result":res})
+class ListRoomsRequestHandler(RequestHandler):
+    @staticmethod
+    def handle_request(connection_address,request):
+        if(not utils.validate_request(request['body'],["user"])):
+            raise ValueError ("Invalid Request, getting online peers requires a user to be signed id")
+        try:
+            res=DB.get_chatrooms_admins()
+        except Exception as e:
+            return S4P_Response.UNKNWNDR(f"something went wrong: {e}")
+
+        return S4P_Response.RMSLISTS(f"Rooms where found",data={"rooms":res})
+
+class AdmitUserRequestHandler(RequestHandler):
+    @staticmethod
+    def handle_request(connection_address,request):
+        if not utils.validate_request(request.get('body',{}),["caller","chatroom_key","user"]):
+            raise ValueError ("Invalid Request, requires caller, chatroom_key and user to be registered")
+        try:
+            if not DB.is_room_owner(request['body']['chatroom_key'],request['body']['caller'].get('_id' )):
+                return S4P_Response.INCRAUTH(f"Only room owners can admit users")
+            res=DB.join_chatroom(request['body']['chatroom_key'],request['body']['user']['_id'])
+        except Exception as e:
+            return S4P_Response.UNKNWNDR(f"something went wrong: {e}")
+
+        return S4P_Response.JOINEDRM(f"User was admitted successfully",data={"result":res})
+
+class GetRoomMembersRequestHandler(RequestHandler):
+    @staticmethod
+    def handle_request(connection_address,request):
+        if not utils.validate_request(request.get('body',{}),["caller","chatroom_key"]):
+            print(request)
+            raise ValueError ("Invalid Request, requires caller, chatroom_key and user to be registered")
+        try:
+            res=DB.get_chatroom_members(request['body']['chatroom_key'])
+            if not res or request['body']['caller'].get('username') not in [i.get('username') for i in res]:
+                return S4P_Response.RMNOTACK(f"Room doesn't exist, or you are not a member")
+        except Exception as e:
+            return S4P_Response.UNKNWNDR(f"something went wrong: {e}")
+
+        return S4P_Response.RMSLISTS(f"Room members where found",data={"members":res})
+
+def handler_factory(request_type)->RequestHandler:
+        handlers={
+        "RGST":RegisterationRequestHandler,
+        "LOGN":LoginRequestHandler,
+        "LGDN":IsLoggedRequestHandler,
+        "CLRS":ClearSessionRequestHandler,
+        "GTOP":GetOnlinePeersHandler,
+        "CRTM":CreateRoomRequestHandler,
+        "LISTRM":ListRoomsRequestHandler,
+        "ADMTUSR":AdmitUserRequestHandler,
+        "GTRM":GetRoomMembersRequestHandler,
+        }
+        if request_type in handlers:
+            return handlers.get(request_type)
+        raise Exception("Request Type not supproted")

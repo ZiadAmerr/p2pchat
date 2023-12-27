@@ -49,10 +49,12 @@ class SockerManager():
     def __init__(self, address, port):
         self.address = address
         self.port = port
-        self.server_socket=None
+        self.socket=None
     def start_socket(self):
         raise NotImplementedError
     def handle_request(self):
+        raise NotImplementedError
+    def deactivate(self):
         raise NotImplementedError
 class UDPManager(SockerManager):
     
@@ -70,14 +72,13 @@ class UDPManager(SockerManager):
         request=pickle.loads(request)
 
         logging.debug(f"Received message from {addr}: {request}")
-        if not validate_request(request.get("body"),["type","username"]):
+        if not validate_request(request.get("body"),["type"]):
             return logging.warn("invalid request")
         try:
             DB.set_last_seen(request.get("body").get("username"))
         except Exception as e:
             logging.error(f"error while setting last seen for {request.get('body').get('username')}: {e}")
             return None
-    
 class TCPManager(SockerManager):
     """
     a thread thats responsible for auth (for now)
