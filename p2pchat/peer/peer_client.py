@@ -345,7 +345,7 @@ class PeerClient():
             peer_left.clear()
             is_in_chat.set()
             print_and_remember(green_text(f"Chat started with {recipient.get('username')}"),magenta_text("write exit_ to exit"))
-            while True and not not_chatting.is_set(): #I know...
+            while not not_chatting.is_set(): #I know...
                 if not ignore_input.is_set():
                     if not(self.connect(recipient)):
                         #won't work if outside the loop
@@ -369,6 +369,14 @@ class PeerClient():
             peer_left.set()
             print(magenta_text(f"Chat ended with {recipient.get('username')}  Press enter to continue."))
 
+    def _refresh_uses_table(self):
+        print_and_remember('?')
+        while not not_chatting.is_set():
+            active_usersnames=[green_text(i.get('username') )for i in self.client_auth_instance.current_chatroom_peers if i.get("is_active")]
+            offline_usersnames=[red_text(i.get('username')) for i in self.client_auth_instance.current_chatroom_peers if not i.get("is_active")]
+            print_in_constant_place(tabulate([[', '.join(active_usersnames),', '.join(offline_usersnames)]],headers=["ACTIVE USERS","OFFLINE USERS"],tablefmt="pretty"),key="peers status",ending_line='you >> ')
+            time.sleep(5)
+
     def chatroom_chat(self):
         """
         will handle all messaging related stuff
@@ -378,12 +386,10 @@ class PeerClient():
         chatroom: array of dicts of room JOIN members
         """
         #user started chatting, used to pause the cli loop
-        active_usersnames=[green_text(i.get('username') )for i in self.client_auth_instance.current_chatroom_peers if i.get("is_active")]
-        offline_usersnames=[red_text(i.get('username')) for i in self.client_auth_instance.current_chatroom_peers if not i.get("is_active")]
+        print_and_remember(magenta_text(f"Chatroom started."))
+        refresh_table=threading.Thread(target=self._refresh_uses_table)
+        
         udp_transceiver=UDPRequestTransceiver()
-        print_and_remember(magenta_text(f"Chatroom started with {len(offline_usersnames)+len(active_usersnames)} members."))
-        print_and_remember(tabulate([[', '.join(active_usersnames),', '.join(offline_usersnames)]],headers=["ACTIVE USERS","OFFLINE USERS"],tablefmt="pretty"))
-
 
         try:
             self.client_auth_instance.current_chatroom=self.client_auth_instance.current_chatroom
@@ -391,12 +397,13 @@ class PeerClient():
             not_chatting.clear()
             peer_left.clear()
             is_in_chat.set()
+            refresh_table.start()
             popped_in_message=blue_text(f"{self.client_auth_instance.user['username']} just popped in !")
             for member in self.client_auth_instance.current_chatroom_peers:
                 udp_transceiver.send_message(S4P_Request.sndmsg_smpl_request(popped_in_message,self.client_auth_instance.current_chatroom,self.client_auth_instance.user),(member.get('IP'),member.get('PORT_UDP')))
 
             print_and_remember(green_text(f"Chatroom started"),magenta_text("write exit_ to exit"))
-            while True and not not_chatting.is_set(): #I know...
+            while not not_chatting.is_set(): #I know...
                 if not ignore_input.is_set():
                     
                     message=input(me_prompt_text)
