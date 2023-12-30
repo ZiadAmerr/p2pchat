@@ -361,6 +361,7 @@ class PeerClient():
                     self.transceiver.send_message(S4P_Request.sndmsg_smpl_request(message,chat_key,self.client_auth_instance.user,recipient))
                     if message=='exit_':
                         is_in_chat.clear()
+                        history.history=[]
                         print(green_text(f"You left the conversation."))
                         break
                     print_and_remember(green_text(f"{self.client_auth_instance.user['username']} >> ")+message)
