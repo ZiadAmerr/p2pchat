@@ -26,7 +26,7 @@ class AuthenticationManager:
     future note: we might move the request type to the header
     """
 
-    types = {"RGST", "LOGN", "LGDN", "CLRS"}
+    types = {"RGST", "LOGN", "LGDN", "CLRS","GTOP","CRTM","LISTRM","ADMTUSR","GTRM"}
 
     def __init__(self, connection_address):
         self.connection_address = connection_address
@@ -36,23 +36,15 @@ class AuthenticationManager:
         """
         parses the recieved request and handle it accordingly
         """
-        if not request.get("body", {}).get("type"):
+        if not request.get("body", {}).get("type") or request.get("body", {}).get("type") not in self.types:
             raise Exception("handle_request: Invalid Request")
-        request_handler = AuthenticationManager._handler_factory(
+        request_handler = handler_factory(
             request.get("body").get("type")
         )
         return request_handler.handle_request(self.connection_address, request)
 
-    def _handler_factory(request_type) -> RequestHandler:
-        handlers = {
-            "RGST": RegisterationRequestHandler,
-            "LOGN": LoginRequestHandler,
-            "LGDN": IsLoggedRequestHandler,
-            "CLRS": ClearSessionRequestHandler,
-        }
-        if request_type in handlers:
-            return handlers.get(request_type)
-        raise Exception("Request Type not supproted")
+
+    
 
 
 if __name__ == "__main__":

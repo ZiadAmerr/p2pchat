@@ -1,7 +1,8 @@
-from .base_protocol import BaseProtocol
+import __init__
+from p2pchat.protocols.base_protocol import BaseResponse
 
 
-class S4P_Response(BaseProtocol):
+class S4P_Response(BaseResponse):
     """
     S4P Response
     """
@@ -21,6 +22,7 @@ class S4P_Response(BaseProtocol):
         71: ("UNKACCNT", "auth is incorrect, unknown username"),
         72: ("UNKNWNRM", "room ID was not found"),
         73: ("UNKRCPNT", "recipient doesn't exist"),
+        731:("RCPNTREF", "recipient refused connection"),
         74: ("RCPNTOFF", "recipient is offline"),
         75: ("RMNOTACK", "room ID was not found in the user's joined rooms"),
         76: ("ALLRMOFF", "all the members of the room are offline"),
@@ -43,32 +45,36 @@ class S4P_Response(BaseProtocol):
     # success codes
 
     @staticmethod
-    def SYNCHACK(message: str, data):
+    def SYNCHACK(message: str, data=None):
         return S4P_Response(50, message, True, data)
 
     @staticmethod
-    def NOCHANGE(message: str, data):
+    def NOCHANGE(message: str, data=None):
         return S4P_Response(51, message, True, data)
 
     @staticmethod
-    def CREATDRM(message: str, data):
+    def CREATDRM(message: str, data=None):
         return S4P_Response(52, message, True, data)
 
     @staticmethod
-    def JOINEDRM(message: str, data):
+    def JOINEDRM(message: str, data=None):
         return S4P_Response(53, message, True, data)
 
     @staticmethod
-    def RMSLISTS(message: str, data):
+    def RMSLISTS(message: str, data=None):
         return S4P_Response(54, message, True, data)
 
     @staticmethod
-    def MESGSENT(message: str, data):
+    def MESGSENT(message: str, data=None):
         return S4P_Response(55, message, True, data)
 
     @staticmethod
-    def MSGSAVED(message: str, data):
+    def MSGSAVED(message: str, data=None):
         return S4P_Response(56, message, True, data)
+
+    @staticmethod
+    def OK(message: str, data=None):
+        return S4P_Response(57, message, True, data)
 
     # failure codes
 
@@ -87,6 +93,10 @@ class S4P_Response(BaseProtocol):
     @staticmethod
     def UNKRCPNT(message: str):
         return S4P_Response(73, message, False)
+    
+    @staticmethod
+    def RCPNTREF(message: str):
+        return S4P_Response(731, message, False)
 
     @staticmethod
     def RCPNTOFF(message: str):
@@ -134,6 +144,9 @@ class S4P_Response(BaseProtocol):
 
 
 class S4P_Request:
+    # RECH <<username>> requests private chat with a user
+    # - Returns 52 CREATDRM: If room creation is successful.
+    # -
     # SYNCHR - Synchronize data
     # Syntax: SYNC <<username>> Synchronizes user's data from the server
     # - Returns 50 SYNCHACK: If the auth is correct.
@@ -182,6 +195,7 @@ class S4P_Request:
         "SYNC",
         "RMCTRL",
         "SNDMSG",
+        "PRIVRM"
     }
 
     def __init__(self, connection):
@@ -195,6 +209,7 @@ class S4P_Request:
             "username": username,
         }
 
+ 
     @staticmethod
     def rmctrl_request(
         kind: str, auth: str, room_id: str = None, room_name: str = None
@@ -220,17 +235,46 @@ class S4P_Request:
             }
         else:
             raise ValueError(f"Unknown kind {kind}")
+    
+    @staticmethod
+    def privrm_request(sender,recipient):
+        """p2p protocol"""
+        return {
+            "type": "PRIVRM",
+            "sender": sender,
+            "recipient": recipient,
+        }
 
     @staticmethod
-    def sndmsg_request(
-        message: str,
-        /,
-        *,
-        auth: str,
-        type_: str,
-        recipient: str = None,
-        room_id: str = None,
-    ):
+    def gtrm_request(sender,chatroom_key):
+        """p2p protocol"""
+        return {
+            "type":"GTRM",
+            "caller":sender,
+            "chatroom_key":chatroom_key
+        }
+    
+    @staticmethod
+    def joinrm_request(sender,chatroom_key):
+        """p2p protocol"""
+        return {
+            "type":"JOINRM",
+            "sender":sender,
+            "chatroom_key":chatroom_key
+        }
+    
+    @staticmethod
+    def sndmsg_smpl_request(message,key,sender,recepient=None):
+        return {
+                "type": "SNDMSG",
+                "message": message,
+                "key": key,
+                "recipient": recepient,
+                "sender":sender
+        }
+
+    @staticmethod
+    def sndmsg_request(message: str,auth: str,type_: str,recipient: str = None,room_id: str = None):
         if type_ == "PRIVRCP":
             return {
                 "type": "SNDMSG",

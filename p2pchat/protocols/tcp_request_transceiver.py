@@ -1,9 +1,37 @@
 import p2pchat.data as data
 import pickle
 import logging
-
-
-class TCPRequestTransceiver:
+import socket
+from p2pchat.utils.colors import *
+class RequestTransceiver:
+    header_size = data.header_size
+    max_udp_packet_size = data.max_udp_packet_size
+    packet_size = max(20, header_size)
+    def __init__(self):
+        self.message = None
+        self.full_message = None
+        self.new_message = True
+        self.message_length = None
+    def recieve_message(self) -> dict:
+        raise NotImplementedError
+    def send_message(self, message: dict):
+        raise NotImplementedError
+    
+    @staticmethod
+    def _gather_message( dest=None, message=None):
+        if message is None:
+            return dest
+        if dest is None:
+            dest = message
+        else:
+            dest += message
+        return dest
+    
+    @staticmethod
+    def _add_header(message :any) -> bytes:
+        "adds header and returns message with headers in bytes"
+        raise NotImplementedError
+class TCPRequestTransceiver(RequestTransceiver):
     """
     this is intended to be a class that wraps the socket.recv/socket.send TCP functions
     it will be used to:
@@ -15,25 +43,12 @@ class TCPRequestTransceiver:
     recieve_message()->dict or None
     """
 
-    header_size = data.header_size
-    packet_size = max(20, header_size)
+    
 
     def __init__(self, connection):
+        super().__init__()
         self.connection = connection
-        self.type = None
-        self.message = None
-        self.full_message = None
-        self.new_message = True
-        self.message_length = None
 
-    def _gather_message(self, dest=None, message=None):
-        if message is None:
-            return dest
-        if dest is None:
-            dest = message
-        else:
-            dest += message
-        return dest
 
     def recieve_message(self) -> dict:
         # TODO: add a timeout
@@ -59,11 +74,6 @@ class TCPRequestTransceiver:
         except Exception as e:
             print("Connection broken: ", e)
             return None
-
-    def send_message(self, message: dict):
-        message_in_bytes = pickle.dumps(message)
-        self.connection.send(self._add_header(message_in_bytes))
-
     @staticmethod
     def _add_header(message: bytes) -> bytes:
         # TODO: move to utils or common class
@@ -73,3 +83,43 @@ class TCPRequestTransceiver:
         """
         message_size = f"{len(message):<{TCPRequestTransceiver.header_size}}"
         return bytes(message_size, "utf-8") + message
+    def send_message(self, message: dict):
+        message_in_bytes = pickle.dumps(message)
+        self.connection.send(self._add_header(message_in_bytes))
+
+
+class UDPRequestTransceiver(RequestTransceiver):
+    def __init__(self,receiving_socket=None):
+        super().__init__()
+        self.sender_socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.receiving_socket=receiving_socket
+    def recieve_message(self) -> dict:
+        if not self.receiving_socket:
+            print(yellow_text("No receiving socket"))
+            return None
+        message,address=self.receiving_socket.recvfrom(RequestTransceiver.max_udp_packet_size)
+        message_in_bytes=pickle.loads(message)
+        return message_in_bytes,address
+    @staticmethod
+    def _add_header(message: dict) -> bytes:
+        # TODO: move to utils or common class
+        """
+        adds any necessary information to the message header, for example, message size
+        need to address what headers are important and how they are formatted, otherwise we will need to add more bytes for a config-file-like headers
+        """
+        message={'header':f"{len(message):<{RequestTransceiver.header_size}}",'body':message}
+        
+        return message
+
+    def send_message(self,message:dict,dest):
+        message_in_bytes = pickle.dumps(self._add_header(message))
+
+        if len(message_in_bytes)>RequestTransceiver.max_udp_packet_size:
+            print(red_text(f"Message too large to send over UDP,Max allowed size {RequestTransceiver.max_udp_packet_size}, message size {len(message_in_bytes)}"))
+        self.sender_socket.sendto(message_in_bytes,dest)
+
+
+
+
+
+        
