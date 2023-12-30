@@ -6,6 +6,7 @@ from p2pchat.utils import utils
 from p2pchat.utils.utils import exception_wrapper
 import logging
 import threading
+
 logging.basicConfig(level=logging.INFO)
 # Decorator function to apply color to text
 
@@ -24,6 +25,7 @@ class ServerDB:
         self.create_user_table()
         self.create_chatrooms_table()
         self.create_chatroom_users_table()
+
     @exception_wrapper
     def create_user_table(self):
         self.cursor.execute(
@@ -43,7 +45,7 @@ class ServerDB:
         """
         )
         self.connection.commit()
-    
+
     @exception_wrapper
     def create_chatroom_users_table(self):
         self.cursor.execute(
@@ -63,7 +65,9 @@ class ServerDB:
 
     @exception_wrapper
     def create_chatrooms_table(self):
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS chatrooms(_id TEXT PRIMARY KEY,key TEXT UNIQUE);""")
+        self.cursor.execute(
+            """CREATE TABLE IF NOT EXISTS chatrooms(_id TEXT PRIMARY KEY,key TEXT UNIQUE);"""
+        )
         self.connection.commit()
 
     @exception_wrapper
@@ -73,11 +77,12 @@ class ServerDB:
                 SELECT u.username,u.is_active,u.PORT,u.IP,cu.is_owner,cu.chatroom_key FROM users u
                 INNER JOIN chatroom_users cu ON u._id=cu.user_id
                 INNER JOIN chatrooms c ON c.key=cu.chatroom_key
-                WHERE c.key= ? ;""",(chatroom_key,)
+                WHERE c.key= ? ;""",
+            (chatroom_key,),
         )
         return self.cursor.fetchall()
+
     @exception_wrapper
-    
     @exception_wrapper
     def get_chatrooms_admins(self):
         self.cursor.execute(
@@ -88,41 +93,45 @@ class ServerDB:
                 WHERE cu.is_owner=1;"""
         )
         return self.cursor.fetchall()
-    
-    def create_chatroom(self, chatroom_key,user_id):
-        chat_room_id=utils.get_unique_id()
+
+    def create_chatroom(self, chatroom_key, user_id):
+        chat_room_id = utils.get_unique_id()
         self.cursor.execute(
-        """
+            """
         INSERT INTO chatrooms (_id,key) VALUES (?,?);
         """,
             (chat_room_id, chatroom_key),
         )
         self.cursor.execute(
-        """
+            """
         INSERT INTO chatroom_users (chatroom_key,user_id,is_owner) VALUES (?,?,1);
         """,
-            (chatroom_key,user_id),
+            (chatroom_key, user_id),
         )
         self.connection.commit()
-    
+
     @exception_wrapper
-    def join_chatroom(self, chatroom_key,user_id):
+    def join_chatroom(self, chatroom_key, user_id):
         self.cursor.execute(
-        """
+            """
         INSERT INTO chatroom_users (chatroom_key,user_id) VALUES (?,?);
         """,
-            (chatroom_key,user_id),
+            (chatroom_key, user_id),
         )
         self.connection.commit()
+
     @exception_wrapper
-    
-    def login(self,username,ip,port,udp_port):
+    def login(self, username, ip, port, udp_port):
         """
         sets a user status to active and updates their ip
         """
-        res=self.cursor.execute(f"UPDATE users SET is_active = 1, IP = ?,PORT = ?, last_seen = {utils.get_timesamp()}, PORT_UDP = ? WHERE username = ?;",(ip,port,udp_port,username))        
+        res = self.cursor.execute(
+            f"UPDATE users SET is_active = 1, IP = ?,PORT = ?, last_seen = {utils.get_timesamp()}, PORT_UDP = ? WHERE username = ?;",
+            (ip, port, udp_port, username),
+        )
         self.connection.commit()
         return res
+
     @exception_wrapper
     def logout(self, username):
         """
@@ -131,17 +140,20 @@ class ServerDB:
 
         try:
             self.cursor.execute(
-                f"UPDATE users SET is_active = 0 WHERE username = ?;",(username,),
+                f"UPDATE users SET is_active = 0 WHERE username = ?;",
+                (username,),
             )
         finally:
             self.connection.commit()
+
     @exception_wrapper
     def register_user(self, username, password):
-            self.cursor.execute(
-                "INSERT INTO users (_id,username, password, created_at) VALUES (?,?, ?, ?);",
-                (utils.get_unique_id(), username, password, utils.get_timesamp()),
-            )
-            self.connection.commit()
+        self.cursor.execute(
+            "INSERT INTO users (_id,username, password, created_at) VALUES (?,?, ?, ?);",
+            (utils.get_unique_id(), username, password, utils.get_timesamp()),
+        )
+        self.connection.commit()
+
     @exception_wrapper
     def account_exists(self, username):
         """
@@ -153,6 +165,7 @@ class ServerDB:
             ).fetchone()
             is not None
         )
+
     @exception_wrapper
     def find(self, table_name, attrs: dict) -> list:
         """
@@ -172,6 +185,7 @@ class ServerDB:
         query = f"SELECT * FROM {table_name} WHERE {conditions};"
         self.cursor.execute(query, tuple(valid_vals))
         return self.cursor.fetchall()
+
     @exception_wrapper
     def get_table_columns(self, table_name):
         try:
@@ -180,6 +194,7 @@ class ServerDB:
         except Exception as e:
             print("couldn't fetch names of columns: ", e)
             return []
+
     @exception_wrapper
     def validate_user(self, username, password):
         """
@@ -193,11 +208,13 @@ class ServerDB:
             ),
         )
         return self.cursor.fetchone()
+
     @exception_wrapper
     def get_active_peers(self):
         """modify later to only include important fileds"""
         self.cursor.execute("SELECT * FROM users WHERE is_active!=0")
         return self.cursor.fetchall()
+
     @exception_wrapper
     def _execute(self, command, commit=False):
         """
@@ -207,6 +224,7 @@ class ServerDB:
         if commit:
             self.connection.commit()
         return res
+
     @exception_wrapper
     def set_last_seen(self, username):
         """
@@ -216,6 +234,7 @@ class ServerDB:
             f"UPDATE users SET last_seen = {utils.get_timesamp()} WHERE username = '{username}';"
         )
         self.connection.commit()
+
     @exception_wrapper
     def is_room_owner(self, chatroom_key, user_id):
         """
@@ -233,10 +252,12 @@ class ServerDB:
                 SELECT u.username as username,u.is_active,u.PORT,u.PORT_UDP as PORT_UDP,u.IP,c.key FROM users u
                 INNER JOIN chatroom_users cu ON u._id=cu.user_id
                 INNER JOIN chatrooms c ON c.key=cu.chatroom_key
-                WHERE c.key=?;""",(chatroom_key,)
+                WHERE c.key=?;""",
+            (chatroom_key,),
         )
         return self.cursor.fetchall()
-    
+
+
 myDB = ServerDB()
 # demo
 if __name__ == "__main__":
@@ -268,4 +289,3 @@ if __name__ == "__main__":
     print(db.get_chatroom_members("af"))
     print(db.get_chatroom_members("aa"))
     print(db.get_chatroom_members("test3"))
-
