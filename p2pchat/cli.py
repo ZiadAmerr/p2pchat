@@ -109,7 +109,7 @@ class App:
         elif choice =="5":
             return "list users"
         elif choice =="6":
-            return "Send a private message"
+            return "send msg"
         elif choice =="7":
             return "exit"
         else:
