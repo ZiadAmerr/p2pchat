@@ -31,14 +31,14 @@ class PeerTCPManager(SockerManager):
                 #print(red_text(f"{bold_text('incoming'),request.get('body',{})}"))
                 if( request.get("body", {}).get("type")=="PRIVRM"):
                     res=self.handle_new_chat_request(request).to_dict()
-                    if res['is_success']:
-                        if res.get("is_success"):
-                            transciver.send_message(res)
-                            client=PeerClient()
-                            print_and_remember(blue_text("you are the server"))
-                            self.chat_thread=threading.Thread(target=client.chat,args=(self.user,request.get("body").get("sender"),self.chat_key))
-                            self.chat_thread.start()
-             
+                    if res.get("is_success"):
+                        transciver.send_message(res)
+                        client=PeerClient()
+                        print_and_remember(blue_text("you are the server"))
+                        self.chat_thread=threading.Thread(target=client.chat,args=(self.user,request.get("body").get("sender"),self.chat_key))
+                        self.chat_thread.start()
+                    else:
+                        transciver.send_message(res)
                 elif request.get("body", {}).get("type")=="SNDMSG":
                     res=self.handle_send_message_request(request).to_dict()
                     transciver.send_message(res)
@@ -52,11 +52,13 @@ class PeerTCPManager(SockerManager):
 
     def handle_new_chat_request(self,request):
         
+        sender=request.get('body').get('sender').get('username')
         if(is_in_chat.is_set()):
+            print_volatile_message(blue_text(f"{sender} tried to contact you"))
+            threading.Timer(5,history.clear_volatile_messages).start()
             return S4P_Response.RCPNTREF('Already in chat')
         if(not utils.validate_request(request['body'],["sender","recipient"])):
             return S4P_Response.INCRAUTH("Invalid Request, Enter chat must have username")
-        sender=request.get('body').get('sender').get('username')
         print(f"Incoming request? Press enter to continue")
         ignore_input.set()
         not_chatting.clear()
