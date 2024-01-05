@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 # demo
 if __name__ == "__main__":
-    db = ServerDB(10)
+    db = ServerDB(100)
    
     x=[]
     y=[]
@@ -27,5 +27,5 @@ if __name__ == "__main__":
         print(f"Elapsed time for {i} threads: {elapsed_time_millis:.2f} milliseconds")
         x.append(i)
         y.append(elapsed_time_millis)
-    plt.plot(x,y)
+    plt.semilogx(x,y)
     plt.show()
