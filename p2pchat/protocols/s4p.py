@@ -22,7 +22,7 @@ class S4P_Response(BaseResponse):
         71: ("UNKACCNT", "auth is incorrect, unknown username"),
         72: ("UNKNWNRM", "room ID was not found"),
         73: ("UNKRCPNT", "recipient doesn't exist"),
-        731:("RCPNTREF", "recipient refused connection"),
+        731: ("RCPNTREF", "recipient refused connection"),
         74: ("RCPNTOFF", "recipient is offline"),
         75: ("RMNOTACK", "room ID was not found in the user's joined rooms"),
         76: ("ALLRMOFF", "all the members of the room are offline"),
@@ -93,7 +93,7 @@ class S4P_Response(BaseResponse):
     @staticmethod
     def UNKRCPNT(message: str):
         return S4P_Response(73, message, False)
-    
+
     @staticmethod
     def RCPNTREF(message: str):
         return S4P_Response(731, message, False)
@@ -191,12 +191,7 @@ class S4P_Request:
     # - Returns 75 RMNOTACK: If the room ID was not found in the user's joined rooms (but might exist
     # elsewhere).
     # - Returns auth errors
-    types = {
-        "SYNC",
-        "RMCTRL",
-        "SNDMSG",
-        "PRIVRM"
-    }
+    types = {"SYNC", "RMCTRL", "SNDMSG", "PRIVRM"}
 
     def __init__(self, connection):
         self.connection = connection
@@ -209,7 +204,6 @@ class S4P_Request:
             "username": username,
         }
 
- 
     @staticmethod
     def rmctrl_request(
         kind: str, auth: str, room_id: str = None, room_name: str = None
@@ -235,9 +229,9 @@ class S4P_Request:
             }
         else:
             raise ValueError(f"Unknown kind {kind}")
-    
+
     @staticmethod
-    def privrm_request(sender,recipient):
+    def privrm_request(sender, recipient):
         """p2p protocol"""
         return {
             "type": "PRIVRM",
@@ -246,35 +240,29 @@ class S4P_Request:
         }
 
     @staticmethod
-    def gtrm_request(sender,chatroom_key):
+    def gtrm_request(sender, chatroom_key):
         """p2p protocol"""
-        return {
-            "type":"GTRM",
-            "caller":sender,
-            "chatroom_key":chatroom_key
-        }
-    
+        return {"type": "GTRM", "caller": sender, "chatroom_key": chatroom_key}
+
     @staticmethod
-    def joinrm_request(sender,chatroom_key):
+    def joinrm_request(sender, chatroom_key):
         """p2p protocol"""
-        return {
-            "type":"JOINRM",
-            "sender":sender,
-            "chatroom_key":chatroom_key
-        }
-    
+        return {"type": "JOINRM", "sender": sender, "chatroom_key": chatroom_key}
+
     @staticmethod
-    def sndmsg_smpl_request(message,key,sender,recepient=None):
+    def sndmsg_smpl_request(message, key, sender, recepient=None):
         return {
-                "type": "SNDMSG",
-                "message": message,
-                "key": key,
-                "recipient": recepient,
-                "sender":sender
+            "type": "SNDMSG",
+            "message": message,
+            "key": key,
+            "recipient": recepient,
+            "sender": sender,
         }
 
     @staticmethod
-    def sndmsg_request(message: str,auth: str,type_: str,recipient: str = None,room_id: str = None):
+    def sndmsg_request(
+        message: str, auth: str, type_: str, recipient: str = None, room_id: str = None
+    ):
         if type_ == "PRIVRCP":
             return {
                 "type": "SNDMSG",

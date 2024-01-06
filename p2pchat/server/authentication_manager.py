@@ -26,7 +26,17 @@ class AuthenticationManager:
     future note: we might move the request type to the header
     """
 
-    types = {"RGST", "LOGN", "LGDN", "CLRS","GTOP","CRTM","LISTRM","ADMTUSR","GTRM"}
+    types = {
+        "RGST",
+        "LOGN",
+        "LGDN",
+        "CLRS",
+        "GTOP",
+        "CRTM",
+        "LISTRM",
+        "ADMTUSR",
+        "GTRM",
+    }
 
     def __init__(self, connection_address):
         self.connection_address = connection_address
@@ -36,15 +46,13 @@ class AuthenticationManager:
         """
         parses the recieved request and handle it accordingly
         """
-        if not request.get("body", {}).get("type") or request.get("body", {}).get("type") not in self.types:
+        if (
+            not request.get("body", {}).get("type")
+            or request.get("body", {}).get("type") not in self.types
+        ):
             raise Exception("handle_request: Invalid Request")
-        request_handler = handler_factory(
-            request.get("body").get("type")
-        )
+        request_handler = handler_factory(request.get("body").get("type"))
         return request_handler.handle_request(self.connection_address, request)
-
-
-    
 
 
 if __name__ == "__main__":
