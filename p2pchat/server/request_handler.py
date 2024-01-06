@@ -1,8 +1,10 @@
 import bcrypt
+
 from p2pchat.protocols.suap import SUAP_Response
 from p2pchat.protocols.s4p import S4P_Response
+from p2pchat.utils.utils import validate_request
+
 from p2pchat.server.server_db import myDB as DB
-from p2pchat.utils import utils
 
 
 class RequestHandler:
@@ -24,7 +26,7 @@ class RegisterationRequestHandler(RequestHandler):
         """
         parses the recieved request and handle it accordingly
         """
-        if not utils.validate_request(request["body"], ["username", "password"]):
+        if not validate_request(request["body"], ["username", "password"]):
             raise Exception(
                 "Invalid Request, Registration mush have username and password"
             )
@@ -53,7 +55,7 @@ class LoginRequestHandler(RequestHandler):
                 {SUAP_Response.render_code("MSMTCH")}
                 {SUAP_Response.render_code("UNKACC")}
         """
-        if not utils.validate_request(
+        if not validate_request(
             request["body"], ["username", "password", "tcp_port", "udp_port"]
         ):
             raise ValueError("Invalid Request, Login must have username and password")
@@ -129,7 +131,7 @@ class IsLoggedRequestHandler(RequestHandler):
                 {SUAP_Response.render_code("INTCPT")}
                 {SUAP_Response.render_code("UNKACC")}
         """
-        if not utils.validate_request(request["body"], ["username"]):
+        if not validate_request(request["body"], ["username"]):
             raise ValueError("Invalid Request, Login check must have username")
         username = request.get("body").get("username")
         # Check if account with such username exists
@@ -170,7 +172,7 @@ class ClearSessionRequestHandler(RequestHandler):
                 {SUAP_Response.render_code("UNKACC")}
                 {SUAP_Response.render_code("LGDOUT")}
         """
-        if not utils.validate_request(request["body"], ["username"]):
+        if not validate_request(request["body"], ["username"]):
             raise ValueError("Invalid Request, clearing session requires a username")
         username = request.get("body").get("username")
         # Check if account with such username exists
@@ -203,7 +205,7 @@ class ClearSessionRequestHandler(RequestHandler):
 class GetOnlinePeersHandler(RequestHandler):
     @staticmethod
     def handle_request(connection_address, request):
-        if not utils.validate_request(request["body"], ["username"]):
+        if not validate_request(request["body"], ["username"]):
             raise ValueError(
                 "Invalid Request, getting online peers requires a username"
             )
@@ -218,7 +220,7 @@ class GetOnlinePeersHandler(RequestHandler):
 class CreateRoomRequestHandler(RequestHandler):
     @staticmethod
     def handle_request(connection_address, request):
-        if not utils.validate_request(request["body"], ["user", "chatroom_key"]):
+        if not validate_request(request["body"], ["user", "chatroom_key"]):
             raise ValueError(
                 "Invalid Request, creating a room requires a user to be signed id"
             )
@@ -237,7 +239,7 @@ class CreateRoomRequestHandler(RequestHandler):
 class ListRoomsRequestHandler(RequestHandler):
     @staticmethod
     def handle_request(connection_address, request):
-        if not utils.validate_request(request["body"], ["user"]):
+        if not validate_request(request["body"], ["user"]):
             raise ValueError(
                 "Invalid Request, getting online peers requires a user to be signed id"
             )
@@ -252,7 +254,7 @@ class ListRoomsRequestHandler(RequestHandler):
 class AdmitUserRequestHandler(RequestHandler):
     @staticmethod
     def handle_request(connection_address, request):
-        if not utils.validate_request(
+        if not validate_request(
             request.get("body", {}), ["caller", "chatroom_key", "user"]
         ):
             raise ValueError(
@@ -277,7 +279,7 @@ class AdmitUserRequestHandler(RequestHandler):
 class GetRoomMembersRequestHandler(RequestHandler):
     @staticmethod
     def handle_request(connection_address, request):
-        if not utils.validate_request(
+        if not validate_request(
             request.get("body", {}), ["caller", "chatroom_key"]
         ):
             print(request)

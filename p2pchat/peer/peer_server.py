@@ -1,24 +1,26 @@
-import socket, logging, select, threading, traceback
+import socket
+import logging
+import select
+import threading
+import traceback
+from time import sleep
+
 from p2pchat.server.server import SockerManager
-from p2pchat.utils.colors import *
-from p2pchat.utils import utils
+from p2pchat.utils.colors import colorize
+from p2pchat.utils.utils import validate_request, get_unique_id
 from p2pchat.protocols.s4p import S4P_Response
-from p2pchat.utils.chat_histoty import (
+from p2pchat.utils.chat_history import (
     history,
     print_and_remember,
     print_volatile_message,
 )
+from p2pchat.globals import is_in_chat, ignore_input, not_chatting, peer_left
+
 from p2pchat.peer.peer_client import PeerClient
-from p2pchat.globals import *
-from p2pchat.peer.peer_client import *
+from p2pchat.peer.peer_client import TCPRequestTransceiver, ClientAuth, UDPRequestTransceiver
 
 
 class PeerTCPManager(SockerManager):
-    """
-    TODO: the notifications,, put is_in_chat to use.
-    TODO: can we move setup and end_chat to more general class?
-    """
-
     def __init__(self, address):
         self.address = address
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -34,14 +36,14 @@ class PeerTCPManager(SockerManager):
             transciver = TCPRequestTransceiver(peer_socket)
             request = transciver.recieve_message()
             if request:
-                # print(red_text(f"{bold_text('incoming'),request.get('body',{})}"))
                 if request.get("body", {}).get("type") == "PRIVRM":
                     res = self.handle_new_chat_request(request).to_dict()
                     if res["is_success"]:
                         if res.get("is_success"):
                             transciver.send_message(res)
                             client = PeerClient()
-                            print_and_remember(blue_text("you are the server"))
+                            print_and_remember(
+                                colorize("you are the server", "blue"))
                             self.chat_thread = threading.Thread(
                                 target=client.chat,
                                 args=(
@@ -66,7 +68,7 @@ class PeerTCPManager(SockerManager):
     def handle_new_chat_request(self, request):
         if is_in_chat.is_set():
             return S4P_Response.RCPNTREF("Already in chat")
-        if not utils.validate_request(request["body"], ["sender", "recipient"]):
+        if not validate_request(request["body"], ["sender", "recipient"]):
             return S4P_Response.INCRAUTH(
                 "Invalid Request, Enter chat must have username"
             )
@@ -76,13 +78,13 @@ class PeerTCPManager(SockerManager):
         not_chatting.clear()
         a = input(f"{sender} wants to chat with you? (y/n): ")
         while a not in ["y", "n"]:
-            print(red_text("invalid input"))
+            print(colorize("invalid input", "red"))
             a = input(f"{sender} wants to chat with you? (y/n): ")
         response = None
         if a == "y":
             is_in_chat.set()
             history.reset_history()
-            key = utils.get_unique_id()
+            key = get_unique_id()
             self.chat_key = key
             response = S4P_Response.CREATDRM(f"your request was accepted", {"key": key})
         elif a == "n":
@@ -96,11 +98,11 @@ class PeerTCPManager(SockerManager):
     def handle_send_message_request(self, request):
         """handles reciving message requests"""
         if not is_in_chat.is_set():
-            print(red_text("can't send while user not in chat"))
+            print(colorize("can't send while user not in chat", "red"))
             return S4P_Response.UNKWNERR(f"can't send while user not in chat")
 
         if not request or request.get("body", {}).get("key") != self.chat_key:
-            print(red_text("Invalid Request, no or invalid key"), request)
+            print(colorize("Invalid Request, no or invalid key", "red"), request)
             return S4P_Response.INCRAUTH("Invalid Request, no or invalid key")
 
         sender = request.get("body", {}).get("sender").get("username", "unknown")
@@ -109,13 +111,13 @@ class PeerTCPManager(SockerManager):
             peer_left.set()
             self.end_chat()
             print(
-                green_text(
-                    f"{sender} left the conversation. Press enter to continue... "
+                colorize(
+                    f"{sender} left the conversation. Press enter to continue... ", "green"
                 )
             )
             return S4P_Response.MESGSENT(f"message recieved ;)", None)
         print_and_remember(
-            f"{yellow_text(f'{sender} >> ')} {message}", ending_line="you >> "
+            f"{colorize(f'{sender} >> ', 'yellow')} {message}", ending_line="you >> "
         )
         return S4P_Response.MESGSENT(f"message recieved", None)
 
@@ -136,14 +138,10 @@ class PeerTCPManager(SockerManager):
         self.socket.close()
 
     def handle_join_room_request(self, request):
-        # if  is_in_chat.is_set():
-        #    print(red_text("user is busy, try again later")) #store it for later?
-        #    return S4P_Response.UNKWNERR(f"can't send while user not in chat")
-
-        if not request or not utils.validate_request(
+        if not request or not validate_request(
             request.get("body", {}), ["sender", "chatroom_key"]
         ):
-            print(red_text("Invalid Request"), request)
+            print(colorize("Invalid Request", "red"), request)
             return S4P_Response.INCRAUTH("Invalid Request, no or invalid key")
 
         sender = request.get("body", {}).get("sender", {})
@@ -151,10 +149,10 @@ class PeerTCPManager(SockerManager):
         print_volatile_message(f"Incoming request? Press enter to continue")
         ignore_input.set()
         a = input(
-            blue_text(f"{sender.get('username')} wants to join {chatroom_key}? (y/n): ")
+            colorize(f"{sender.get('username')} wants to join {chatroom_key}? (y/n): ", "blue")
         )
         while a not in ["y", "n"]:
-            print_volatile_message(red_text("invalid input"))
+            print_volatile_message(colorize("invalid input", "red"))
             a = input(f"{sender.get('username')} wants to join {chatroom_key}? (y/n): ")
         res = None
         if a == "y":
@@ -162,19 +160,19 @@ class PeerTCPManager(SockerManager):
             response = me_to_server_client.admit_user_to_chatroom(sender, chatroom_key)
             if response.get("body").get("is_success"):
                 print_volatile_message(
-                    green_text(
-                        f"{sender.get('username')} was added to chatroom \"{chatroom_key}\" successfully."
+                    colorize(
+                        f"{sender.get('username')} was added to chatroom \"{chatroom_key}\" successfully.", "green"
                     )
                 )
                 res = S4P_Response.JOINEDRM(
                     f"your request was accepted", {"key": chatroom_key}
                 )
             else:
-                print_volatile_message(red_text("couldn't admit user to chatroom."))
+                print_volatile_message(colorize("couldn't admit user to chatroom.", "green"))
                 res = S4P_Response.UNKWNERR(
                     f"Couldn't join chatroom, try again later, or may be you are already registerd"
                 )
-            time.sleep(2)
+            sleep(2)
             history.clear_volatile_messages()
             print_and_remember("")
         else:
@@ -195,7 +193,6 @@ class PeerUDPManager(SockerManager):
             udp_transciver = UDPRequestTransceiver(self.socket)
             request, address = udp_transciver.recieve_message()
             if request:
-                # print(red_text(f"{bold_text('incoming'),request.get('body',{})}"))
                 if request.get("body", {}).get("type") == "SNDMSG":
                     res = self.handle_send_message_request(request).to_dict()
                     udp_transciver.send_message(res, address)
@@ -207,14 +204,13 @@ class PeerUDPManager(SockerManager):
     def handle_send_message_request(self, request):
         """handles reciving message requests"""
         if not is_in_chat.is_set():
-            # print(red_text("can't send while user not in chat.?"))
             return S4P_Response.UNKWNERR(f"can't send while user not in chat")
 
         if (
             not request
             or request.get("body", {}).get("key") != ClientAuth().current_chatroom
         ):
-            print(red_text("Invalid Request, no or invalid key"), request)
+            print(colorize("Invalid Request, no or invalid key", "red"), request)
             return S4P_Response.INCRAUTH("Invalid Request, no or invalid key")
 
         sender_name = request.get("body", {}).get("sender").get("username", "unknown")
@@ -222,10 +218,10 @@ class PeerUDPManager(SockerManager):
 
         message = request.get("body", {}).get("message", "")
         if message == "exit_":
-            print_and_remember(magenta_text(f"{sender_name} left the conversation"))
+            print_and_remember(colorize(f"{sender_name} left the conversation", "magenta"))
             return S4P_Response.MESGSENT(f"message recieved ;)", None)
         print_and_remember(
-            f"{yellow_text(f'{sender_name} >> ')} {message}", ending_line="you >> "
+            f"{colorize(f'{sender_name} >> ', 'yellow')} {message}", ending_line="you >> "
         )
         return S4P_Response.MESGSENT(f"message recieved", None)
 
@@ -265,7 +261,7 @@ class PeerServer(threading.Thread):
         self.udp_manager.deactivate()
 
     def run(self):
-        print(f"started listening at :{self.tcp_manager.port}")
+        logging.info(f"started listening at :{self.udp_manager.port}")
         self.work = True
         self._activate()
         socket_to_manager = {

@@ -1,8 +1,6 @@
 import __init__
 from p2pchat.protocols.suap import SUAP_Response
-from p2pchat.server.request_handler import *
-from p2pchat.server.server_db import myDB as DB
-from p2pchat.utils import utils
+from p2pchat.server.request_handler import handler_factory
 
 
 class AuthenticationManager:

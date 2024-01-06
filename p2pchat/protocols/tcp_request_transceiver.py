@@ -2,12 +2,12 @@ import pickle
 import logging
 import socket
 
-from p2pchat.utils.colors import *
-import p2pchat.data as data
+from p2pchat.utils.colors import colorize
+from p2pchat.data import header_size, max_udp_packet_size
 
 class RequestTransceiver:
-    header_size = data.header_size
-    max_udp_packet_size = data.max_udp_packet_size
+    header_size = header_size
+    max_udp_packet_size = max_udp_packet_size
     packet_size = max(20, header_size)
 
     def __init__(self):
@@ -120,7 +120,7 @@ class UDPRequestTransceiver(RequestTransceiver):
             dict: message recieved
         """
         if not self.receiving_socket:
-            print(yellow_text("No receiving socket"))
+            print(colorize("No receiving socket", "yellow"))
             return None
         message, address = self.receiving_socket.recvfrom(
             RequestTransceiver.max_udp_packet_size
@@ -156,8 +156,8 @@ class UDPRequestTransceiver(RequestTransceiver):
 
         if len(message_in_bytes) > RequestTransceiver.max_udp_packet_size:
             print(
-                red_text(
-                    f"Message too large to send over UDP,Max allowed size {RequestTransceiver.max_udp_packet_size}, message size {len(message_in_bytes)}"
+                colorize(
+                    f"Message too large to send over UDP,Max allowed size {RequestTransceiver.max_udp_packet_size}, message size {len(message_in_bytes)}", "red"
                 )
             )
         self.sender_socket.sendto(message_in_bytes, dest)

@@ -1,17 +1,56 @@
 import __init__
-from p2pchat.peer.peer_client import *
-from p2pchat.peer.peer_server import *
 from tabulate import tabulate
-import time
-import uuid  # Import the UUID module
-from p2pchat.custom_logger import app_logger
+from time import sleep
+import uuid
 import logging
-from p2pchat.utils.colors import *
-from p2pchat.utils.utils import clear_console
-from p2pchat.utils.chat_histoty import history, print_and_remember
+from pwinput import pwinput
+
+from p2pchat.custom_logger import app_logger
+from p2pchat.peer.peer_client import PeerClient, ClientAuth
+from p2pchat.peer.peer_server import PeerServer
+from p2pchat.utils.colors import colorize
+from p2pchat.utils.chat_history import history, print_and_remember, clear_console
 from p2pchat.globals import not_chatting, ignore_input
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
+
+IDLE_WAIT = 1  # change to 3 for slower changing between screens
+
+
+MAIN_MENU_TEXT = f"""
+{colorize(f'{colorize("Welcome to Our chat", "magenta")} - {colorize("Main Menu", "yellow")}', 'underline')}
+
+Choices:
+    {colorize('1', 'green')}. Create room
+    {colorize('2', 'green')}. List available rooms
+    {colorize('3', 'green')}. Enter chatroom
+    {colorize('4', 'green')}. Join Room
+    {colorize('5', 'green')}. List online users
+    {colorize('6', 'green')}. Send a private message
+    {colorize('7', 'red')}. Logout
+"""
+
+
+def show_profile(username, id, communicated_with):
+    print(f"Username: {username}")
+    print(f"ID: {id}")
+
+    communicated_with = communicated_with
+
+    if communicated_with:
+        print("Users You've Chat With:")
+        for user in communicated_with:
+            print(user)
+    else:
+        print("No chat history yet.")
+
+
+def print_menu(choice):
+    if choice == "chatroom_menu":
+        print(f"""
+{colorize('Create a chatroom', 'yellow')}
+
+{colorize('Enter chatroom name to create: ', 'green')}""", end="")
 
 
 class App:
@@ -24,17 +63,21 @@ class App:
         self.peer_client = PeerClient()
 
     def welcome_state(self):
-        print("Welcome to Our chat")
+        clear_console()
+        print(colorize(colorize("Welcome to Our chat", "underline"), "magenta"))
         print()
-        has_account = input("Do you have an account? (y/n): ")
+        has_account = input(f"Do you have an account? ({colorize('y', 'green')}/{colorize('n', 'red')}): ")
 
         while has_account not in ["y", "n"]:
-            print(yellow_text("Please enter a valid response"))
+            clear_console()
+            print(colorize("Please enter a valid response, as", "yellow"), colorize(f"{has_account}", "red"), colorize("is not a valid response", "yellow"))
             has_account = input("Do you have an account? (y/n): ")
-        if has_account == "y":
-            return "Login"
-        elif has_account == "n":
-            return "Sign Up"
+        
+        if has_account in ["y", "n"]:
+            return {
+                "y": "Login",
+                "n": "Sign Up"
+            }[has_account]
 
     def login_state(self):
         if self.client_auth.user is not None:
@@ -44,23 +87,26 @@ class App:
             "incorrect_attempt" in self.incorrect_attempt
             and self.incorrect_attempt["incorrect_attempt"] >= 3
         ):
-            print(red_text("Account locked. Try again in 1 minute."))
+            print(colorize("Account locked. Try again in 1 minute.", "red"))
             return None
 
         if (
             "incorrect_attempt" in self.incorrect_attempt
             and self.incorrect_attempt["incorrect_attempt"]
         ):
-            print(red_text("Incorrect username or password"))
+            print(colorize("Incorrect username or password", "red"))
             print()
 
-        username = input("Username: ")
-        password = input("Password: ")
 
-        """ if len(password) < 6:
-            print(red_text("Invalid password. Password must be at least 6 digits long."))
-            return "Login"
-         """
+        if self.incorrect_attempt["incorrect_attempt"] > 0:
+            print(colorize("Type ", "magenta") + colorize("!exit", "red") + colorize(" if you want to go back to the previous menu", "magenta"))
+        username = input("Username: ")
+
+        if username == "!exit":
+            return "Welcome"
+        
+        password = pwinput("Password: ")
+
         response = self.client_auth.login(
             username,
             password,
@@ -71,6 +117,9 @@ class App:
             self.peer_server.start()
             self.peer_server.set_user(self.client_auth.user)
             self.incorrect_attempt["incorrect_attempt"] = 0
+
+            print(colorize(f"Welcome {username}!", "green"))
+
             return "Main Menu"
         else:
             self.incorrect_attempt["incorrect_attempt"] = (
@@ -79,9 +128,14 @@ class App:
             return "Login"
 
     def signup_state(self):
-        # email = input("Email: ")
+        print(colorize("Create an account!", "yellow"))
+
+        print(colorize(
+            "Type '!exit' if you want to go back to the previous menu", "magenta"))
         username = input("Username: ")
-        password = input("Password: ")
+        if username == "!exit":
+            return "Welcome"
+        password = pwinput("Password: ")
 
         """ if not re.match(r"^\w+@\w+\.\w+$", email):
             print("Invalid email address.")
@@ -96,19 +150,12 @@ class App:
             print(response.get("body", {}).get("message"))
             return "Sign Up"
 
-        print("Account created successfully!")
+        print(colorize(f"Account created successfully! You will be redirected in {IDLE_WAIT} seconds.", "green"))
 
         return "Welcome"
 
     def menu_state(self):
-        print("Main Menu")
-        print("1. Create room")
-        print("2. List available rooms")
-        print("3. Enter chatroom")
-        print("4. Join Room")
-        print("5. List online users")
-        print("6. Send a private message")
-        print("7. Exit")
+        print(MAIN_MENU_TEXT)
 
         choice = input("Please enter your choice: ")
         if choice == "1":
@@ -132,17 +179,8 @@ class App:
         print("Your Profile")
 
         if "username" in self.state_data["user"]:
-            print(f"Username: {self.state_data['user']['username']}")
-            print(f"ID: {self.state_data['user']['id']}")
-
-            communicated_with = self.state_data["user"].get("communicated_with", set())
-
-            if communicated_with:
-                print("Users You've Chat With:")
-                for user in communicated_with:
-                    print(user)
-            else:
-                print("No chat history yet.")
+            show_profile(self.state_data['user']['username'], self.state_data['user']['id'], self.state_data["user"].get(
+        "communicated_with", set()))
         else:
             print("Username not found.")
             if self.state_data["users"]:
@@ -162,25 +200,24 @@ class App:
         return "Main Menu"
 
     def create_chatroom_state(self):
-        print("Create a chatroom")
-        room_name = input("Enter the name of the chatroom: ")
-        res = self.client_auth.create_chatroom(room_name)
-
+        print_menu("chatroom_intro")
+        room_name = input()
+        self.client_auth.create_chatroom(room_name)
         return "Main Menu"
 
     def list_rooms_state(self):
         print("List available rooms")
         self.client_auth.available_rooms = self.client_auth.get_chatrooms()
         if len(self.client_auth.available_rooms):
-            headers = [bold_text(i) for i in ["ROOM KEY", "OWNER", "OWNER STATUS"]]
+            headers = [colorize(i, "bold") for i in ["ROOM KEY", "OWNER", "OWNER STATUS"]]
             data = []
             for room in self.client_auth.available_rooms:
                 status = (
-                    yellow_text("you")
+                    colorize("you", "yellow")
                     if room["owner"] == self.client_auth.user["username"]
-                    else green_text("Available")
+                    else colorize("Available", "green")
                     if room["is_active"]
-                    else red_text("Not Available")
+                    else colorize("Not Available", "red")
                 )  # iknow...
                 data.append([room["key"], room["owner"], status])
             print(tabulate(data, headers=headers, tablefmt="pretty"))
@@ -212,11 +249,11 @@ class App:
             key = response.get("body").get("data").get("key")
 
             self.peer_server.setup_chat(key)
-            print_and_remember(blue_text("you are the client"))
+            print_and_remember(colorize("you are the client", "blue"))
             self.peer_client.chat(self.client_auth.user, user, key)
             self.peer_server.end_chat()
         else:
-            print(red_text("couldn't connect"))
+            print(colorize("couldn't connect", "red"))
         return "Main Menu"
 
     def join_room_state(self):
@@ -236,7 +273,7 @@ class App:
             if room["key"] == chat_room
         )
         if not room["is_active"]:
-            print(red_text("Room owner is offline"))
+            print(colorize("Room owner is offline", "red"))
             return "Main Menu"
         response = self.peer_client.join_chatroom(room)
 
@@ -253,7 +290,7 @@ class App:
         if chatroom_key not in [
             room["key"] for room in self.client_auth.available_rooms
         ]:
-            print(red_text("Chatroom not found."))
+            print(colorize("Chatroom not found.", "red"))
             return "Main Menu"
 
         self.peer_client.enter_chatroom(chatroom_key)
@@ -281,7 +318,6 @@ class App:
         while True:
             not_chatting.wait()
             if ignore_input.is_set():
-                time.sleep(1)
                 continue
             if state == "Welcome":
                 next_state = self.welcome_state()
@@ -309,10 +345,12 @@ class App:
                 if self.client_auth.user is not None:
                     next_state = "Main Menu"
                 else:
-                    time.sleep(60)
+                    # sleep(2)
                     self.incorrect_attempt["incorrect_attempt"] = 0
                     next_state = "Login"
 
+            sleep(IDLE_WAIT)
+            clear_console()
             state = next_state
 
 

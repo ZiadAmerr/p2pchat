@@ -1,14 +1,12 @@
 import __init__
 import sqlite3
-import datetime
-from pathlib import Path
-from p2pchat.utils import utils
-from p2pchat.utils.utils import exception_wrapper
 import logging
-import threading
+from pathlib import Path
 
-logging.basicConfig(level=logging.INFO)
-# Decorator function to apply color to text
+from p2pchat.utils.utils import dict_factory, get_timesamp, get_unique_id, exception_wrapper
+
+
+# logging.basicConfig(level=logging.INFO)
 
 
 class ServerDB:
@@ -20,7 +18,7 @@ class ServerDB:
         self.connection = sqlite3.connect(
             Path(Path(__file__).parent, "server.db"), check_same_thread=False
         )
-        self.connection.row_factory = utils.dict_factory
+        self.connection.row_factory = dict_factory
         self.cursor = self.connection.cursor()
         self.create_user_table()
         self.create_chatrooms_table()
@@ -95,7 +93,7 @@ class ServerDB:
         return self.cursor.fetchall()
 
     def create_chatroom(self, chatroom_key, user_id):
-        chat_room_id = utils.get_unique_id()
+        chat_room_id = get_unique_id()
         self.cursor.execute(
             """
         INSERT INTO chatrooms (_id,key) VALUES (?,?);
@@ -126,7 +124,7 @@ class ServerDB:
         sets a user status to active and updates their ip
         """
         res = self.cursor.execute(
-            f"UPDATE users SET is_active = 1, IP = ?,PORT = ?, last_seen = {utils.get_timesamp()}, PORT_UDP = ? WHERE username = ?;",
+            f"UPDATE users SET is_active = 1, IP = ?,PORT = ?, last_seen = {get_timesamp()}, PORT_UDP = ? WHERE username = ?;",
             (ip, port, udp_port, username),
         )
         self.connection.commit()
@@ -150,7 +148,7 @@ class ServerDB:
     def register_user(self, username, password):
         self.cursor.execute(
             "INSERT INTO users (_id,username, password, created_at) VALUES (?,?, ?, ?);",
-            (utils.get_unique_id(), username, password, utils.get_timesamp()),
+            (get_unique_id(), username, password, get_timesamp()),
         )
         self.connection.commit()
 
@@ -231,7 +229,7 @@ class ServerDB:
         sets the last seen of a user to the current time
         """
         self.cursor.execute(
-            f"UPDATE users SET last_seen = {utils.get_timesamp()} WHERE username = '{username}';"
+            f"UPDATE users SET last_seen = {get_timesamp()} WHERE username = '{username}';"
         )
         self.connection.commit()
 

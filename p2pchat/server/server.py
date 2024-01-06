@@ -1,48 +1,23 @@
-"""
-The server should have a tcp and udp threads,
-tcp should handle sign in,sign up,login, get peers (next phase message queues) requests,
-udp should handle HELLO messages, it recieves username in message data, and uses DB.set_last_seen to activate the user (set his last seen to now)
-the server must have a thread that checks every minute the last seen of all users, and if it is more than 3 minutes, it should deactivate the user
-
-udp thread:
-    while true:
-    recieve message
-    if message is HELLO:
-        DB.set_last_seen(message.data) #asynchronous
-    else:
-        ignore
-
-tcp thread:
-    while true:
-    recieve message
-    if message is auth_related:
-        prepare auth_manager:
-        if message is SIGNUP:
-            auth_manager.signup(message.data)
-        elif message is LOGIN:
-            auth_manager.login(message.data)
-        elif message is GET_PEERS:
-            DB.get_online()
-        else
-            err
-    else:
-        ignore for now
-"""
 import __init__
 import threading
 import traceback
 import socket
 import pickle
-from p2pchat.utils.utils import validate_request
-from p2pchat.server.server_db import myDB as DB
-from p2pchat.server.authentication_manager import AuthenticationManager
-from p2pchat.protocols.tcp_request_transceiver import TCPRequestTransceiver
-from p2pchat import data
-from p2pchat.protocols.suap import SUAP_Response
-from p2pchat.custom_logger import logging
 import select
 import logging
+import sys
+from typing import List, Union, Dict
+
 from p2pchat.server.monitor import UsersMonitor
+from p2pchat.protocols.tcp_request_transceiver import TCPRequestTransceiver
+from p2pchat.protocols.suap import SUAP_Response
+from p2pchat.utils.utils import validate_request
+from p2pchat.utils.colors import colorize
+from p2pchat.data import port_tcp, port_udp
+
+from p2pchat.server.server_db import myDB as DB
+from p2pchat.server.authentication_manager import AuthenticationManager
+
 
 
 class SockerManager:
@@ -84,6 +59,10 @@ class UDPManager(SockerManager):
                 f"error while setting last seen for {request.get('body').get('username')}: {e}"
             )
             return None
+    
+    def deactivate(self):
+        self.server_socket.close()
+        logging.info(f"UDP server thread stopped at port {self.port}")
 
 
 class TCPManager(SockerManager):
@@ -129,22 +108,50 @@ class TCPManager(SockerManager):
         except Exception as e:
             print("Exception Occued: ", traceback.print_exc(e))
             return None
+    
+    def deactivate(self):
+        self.server_socket.close()
+        logging.info(f"TCP server thread stopped at port {self.port}")
+
+
+def terminate(clients_montior: UsersMonitor, sockets_managers: List[Union[TCPManager, UDPManager]], recurse_limit=4):
+    if recurse_limit < 0:
+        return
+
+    try:
+        clients_montior.deactivate()
+        for manager in sockets_managers:
+            manager.deactivate()
+        sys.exit(0)
+    except KeyboardInterrupt:
+        terminate(recurse_limit=recurse_limit-1)
 
 
 if __name__ == "__main__":
-    server_udp_manager = UDPManager("127.0.0.1", data.port_udp)
-    server_tcp_manager = TCPManager("127.0.0.1", data.port_tcp)
+    server_udp_manager = UDPManager("127.0.0.1", port_udp)
+    server_tcp_manager = TCPManager("127.0.0.1", port_tcp)
     clients_montior = UsersMonitor()
     clients_montior.start()
-    sockets_managers = [server_tcp_manager, server_udp_manager]
+    
+    sockets_managers: List[Union[TCPManager, UDPManager]] = [server_tcp_manager, server_udp_manager]
+    
     managers_socks = {}
     for manager in sockets_managers:
         manager.start_socket()
         managers_socks[manager] = manager.server_socket
-    socket_to_manager = {v: k for k, v in managers_socks.items()}
+    
+    socket_to_manager: Dict[socket.socket, Union[TCPManager, UDPManager]] = {v: k for k, v in managers_socks.items()}
 
     socks = list(managers_socks.values())
-    while socks:
-        readable, _, _ = select.select(socks, [], [])
-        for s in readable:
-            socket_to_manager[s].handle_request()
+    
+    try:
+        while socks:
+            readable, _, _ = select.select(socks, [], [])
+            for s in readable:
+                socket_to_manager[s].handle_request()
+    except KeyboardInterrupt:
+        print(colorize("KeyboardInterrupt - terminating...", "red"))
+        terminate(clients_montior, sockets_managers)
+
+    
+    

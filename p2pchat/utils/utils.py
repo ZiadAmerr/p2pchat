@@ -27,8 +27,8 @@ def validate_request(requset: dict, required_fields):
 
 
 def dict_factory(cursor, row):
-    """by default sqlite return qurey results as tuples,
-    we override the connection.row_factory to convert sqlite3 rows to dicts for ease of access
+    """by default SQLite returns query results as tuples,
+    we override the connection.row_factory to convert SQLite3 rows to dicts for ease of access
     """
     d = {}
     for idx, col in enumerate(cursor.description):
@@ -37,7 +37,6 @@ def dict_factory(cursor, row):
 
 
 def clear_console():
-    # Clear console screen
     os.system("cls" if os.name == "nt" else "clear")
 
 
@@ -48,6 +47,6 @@ def exception_wrapper(func):
             return result
         except Exception as e:
             print(f"An exception occurred: {e}")
-            return None  # Handle the exception as needed
+            return None 
 
     return wrapper

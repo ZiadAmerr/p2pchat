@@ -1,6 +1,7 @@
 import __init__
-from p2pchat.utils.utils import clear_console
 import time
+
+from p2pchat.utils.utils import clear_console
 
 
 def print_and_remember(*args, ending_line=None):
@@ -11,7 +12,6 @@ def print_and_remember(*args, ending_line=None):
 
 
 def print_in_constant_place(*args, key=None, ending_line=None):
-    # append if notexist, else replace
     text = " ".join([str(arg) for arg in args])
     if key is None:
         print_and_remember(

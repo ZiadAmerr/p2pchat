@@ -3,8 +3,10 @@ from pathlib import Path
 
 config = configparser.ConfigParser()
 # doesn't seem to read relative paths correctly
-c = config.read(Path(Path(__file__).parent, "cfg.ini"))
-port_tcp = int(config.get("connection", "port_tcp"))
-port_udp = int(config.get("connection", "port_udp"))
-header_size = int(config.get("consts", "header_size"))
-max_udp_packet_size = int(config.get("consts", "max_udp_packet_size"))
+
+# config.read(Path(Path(__file__).parent, "cfg.ini"))
+
+port_tcp = 15600
+port_udp = 15500
+header_size = 10
+max_udp_packet_size = 4096

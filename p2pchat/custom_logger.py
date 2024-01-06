@@ -1,7 +1,3 @@
-"""
-this file will be used to add cli featrues such as logging, coloring, etc
-"""
-# TODO: make it work
 import logging
 
 

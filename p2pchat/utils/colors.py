@@ -1,57 +1,35 @@
-class Colors:
-    RED = "\033[91m"
-    GREEN = "\033[92m"
-    YELLOW = "\033[93m"
-    BLUE = "\033[94m"
-    MAGENTA = "\033[95m"
-    CYAN = "\033[96m"
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
-    END = "\033[0m"
+STYLES = {
+    "red": "\033[91m",
+    "green": "\033[92m",
+    "yellow": "\033[93m",
+    "blue": "\033[94m",
+    "magenta": "\033[95m",
+    "cyan": "\033[96m",
+    "bold": "\033[1m",
+    "underline": "\033[4m",
+    "end": "\033[0m",
+}
 
 
-# Decorator function to apply color to text
-def color_text(color):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            return f"{color}{func(*args, **kwargs)}{Colors.END}"
+def colorize(text, style: str=None):
+    if style is not None:
+        if style in STYLES.keys():
+            start = STYLES[style]
+            end = STYLES["end"]
 
-        return wrapper
-
-    return decorator
-
-
-@color_text(Colors.RED)
-def red_text(text):
+            return f"{start}{text}{end}"
+        
+        raise ValueError(
+            f"Invalid style: {style}, choose from {STYLES.keys()}")
+    
     return text
+         
 
 
-@color_text(Colors.GREEN)
-def green_text(text):
-    return text
-
-
-@color_text(Colors.YELLOW)
-def yellow_text(text):
-    return text
-
-
-@color_text(Colors.BLUE)
-def blue_text(text):
-    return text
-
-
-@color_text(Colors.MAGENTA)
-def magenta_text(text):
-    return text
-
-
-@color_text(Colors.BOLD)
-def bold_text(text):
-    return text
-
-
-# usage
+# Usage
 if __name__ == "__main__":
-    print(bold_text(red_text("hello world")))
-    print(magenta_text("hi there"))
+    text1 = "hello world"
+    text2 = "hi there"
+
+    print(colorize(text1, "red"))
+    print(colorize(text2, "underline"))

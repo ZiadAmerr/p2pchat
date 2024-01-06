@@ -1,12 +1,9 @@
-"""
-this class is intended to monitor the clients
-every 20 seconds, this monitor will check the last seen of all clients, deactiveate the inactive ones
-"""
 import __init__
 import threading
+import time
+
 from p2pchat.server.server_db import myDB as DB
 from p2pchat.utils.utils import get_timesamp
-import time
 
 
 class UsersMonitor(threading.Thread):
@@ -30,3 +27,7 @@ class UsersMonitor(threading.Thread):
 
     def stop_monitoring(self):
         self.keep_monitoring = False
+    
+    def deactivate(self):
+        self.stop_monitoring()
+        self.join()

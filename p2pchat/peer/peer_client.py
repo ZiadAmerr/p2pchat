@@ -1,56 +1,26 @@
-import traceback
-
-"""
-The server should have a tcp and udp threads,
-tcp should handle sign in,sign up,login, get peers (next phase message queues) requests,
-udp should handle HELLO messages, it recieves username in message data, and uses DB.set_last_seen to activate the user (set his last seen to now)
-the server must have a thread that checks every minute the last seen of all users, and if it is more than 3 minutes, it should deactivate the user
-
-udp thread:
-    while true:
-    recieve message
-    if message is HELLO:
-        DB.set_last_seen(message.data) #asynchronous
-    else:
-        ignore
-
-tcp thread:
-    while true:
-    recieve message
-    if message is auth_related:
-        prepare auth_manager:
-        if message is SIGNUP:
-            auth_manager.signup(message.data)
-        elif message is LOGIN:
-            auth_manager.login(message.data)
-        elif message is GET_PEERS:
-            DB.get_online()
-        else
-            err
-    else:
-        ignore for now
-"""
 import __init__
+import traceback
 import threading
 import socket
 import pickle
+from time import sleep
+from tabulate import tabulate
+
 from p2pchat.protocols.tcp_request_transceiver import (
     TCPRequestTransceiver,
     UDPRequestTransceiver,
 )
 from p2pchat.protocols.suap import SUAP_Request
-from p2pchat.protocols.s4p import *
-from p2pchat.utils.colors import *
-from p2pchat.utils.chat_histoty import *
-from p2pchat import data
+from p2pchat.protocols.s4p import S4P_Request
+from p2pchat.utils.colors import colorize
+from p2pchat.utils.chat_history import print_and_remember, print_in_constant_place, history
+from p2pchat.data import port_tcp, port_udp
 import logging
 
 # logging.basicConfig(level=logging.DEBUG)
-import time
 from p2pchat.custom_logger import app_logger  # may use different loggers later
-from p2pchat.globals import *
+from p2pchat.globals import not_chatting, peer_left, ignore_input, is_in_chat
 from p2pchat.utils.utils import validate_request
-from tabulate import tabulate
 
 
 class KeepAliveThread(threading.Thread):
@@ -85,7 +55,7 @@ class KeepAliveThread(threading.Thread):
                     self.client_socket.sendto(
                         message, (self.server_address, self.server_port)
                     )
-                time.sleep(self.interval)
+                sleep(self.interval)
             except Exception as e:
                 print("Exception Occued: ", traceback.print_exc(e))
                 return None
@@ -114,12 +84,14 @@ class ClientTCPThread:
 
     def connect(self):
         try:
-            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client_socket = socket.socket(
+                socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect((self.server_address, self.server_port))
             self.transceiver.connection = self.client_socket
             return True
         except ConnectionRefusedError:
-            app_logger.warning("Connection refused. Server may not be available.")
+            app_logger.warning(
+                "Connection refused. Server may not be available.")
         except TimeoutError:
             app_logger.warning("Connection attempt timed out.")
         except OSError as e:
@@ -148,7 +120,8 @@ class ClientTCPThread:
                 "header": "",
                 "body": {"is_success": False, "message": "Connection failed"},
             }
-        self.transceiver.send_message(SUAP_Request.rgst_request(username, password))
+        self.transceiver.send_message(
+            SUAP_Request.rgst_request(username, password))
         response = self.transceiver.recieve_message()
         self.client_socket.close()
         return response
@@ -202,7 +175,8 @@ class ClientTCPThread:
                 "header": "",
                 "body": {"is_success": False, "message": "Connection failed"},
             }
-        self.transceiver.send_message({"type": "LISTRM", "user": self.client_auth.user})
+        self.transceiver.send_message(
+            {"type": "LISTRM", "user": self.client_auth.user})
         response = self.transceiver.recieve_message()
         self.client_socket.close()
         return response
@@ -244,7 +218,8 @@ def requires_signin(func):
         if getattr(self, "user", None) is not None:
             return func(self, *args, **kwargs)
         else:
-            print(red_text(f"Operation Reqires user to be logged in,{self.to_dict()}"))
+            print(
+                colorize(f"Operation Reqires user to be logged in,{self.to_dict()}", "red"))
             return {
                 "header": "",
                 "body": {"is_success": False, "message": "User not logged in"},
@@ -269,9 +244,10 @@ class ClientAuth:
             self.available_rooms = []  # all chatrooms, updated by a thread
             self.current_chatroom = None
             self.current_chatroom_peers = None
-            self.client_tcp_thread = ClientTCPThread("127.0.0.1", data.port_tcp)
+            self.client_tcp_thread = ClientTCPThread(
+                "127.0.0.1", port_tcp)
             self.keep_alive_thread = KeepAliveThread(
-                "127.0.0.1", data.port_udp, user=self.user
+                "127.0.0.1", port_udp, user=self.user
             )
 
     def login(self, username: str, password: str, tcp_port: int, udp_port=None) -> dict:
@@ -280,13 +256,14 @@ class ClientAuth:
         if request is successful, keep alive thread is started, user is returnred in client.user object.
         response dictionary is returnred as well
         """
-        response = self.client_tcp_thread.login(username, password, tcp_port, udp_port)
+        response = self.client_tcp_thread.login(
+            username, password, tcp_port, udp_port)
         if response.get("body", {}).get("is_success"):
             self.user = response.get("body").get("data")
             self.keep_alive_thread.user = self.user
             self.keep_alive_thread.start()
         else:
-            print(f"Failed to login: {response.get('body',{}).get('message')}")
+            logging.info(f"Failed to login: {response.get('body',{}).get('message')}")
         return response
 
     def signup(self, username: str, password: str) -> dict:
@@ -309,7 +286,7 @@ class ClientAuth:
         """
 
         if not self.user:
-            print(red_text("User not logged in"))
+            print(colorize("User not logged in", "red"))
             return {
                 "header": "",
                 "body": {"is_success": False, "message": "User not logged in"},
@@ -319,21 +296,21 @@ class ClientAuth:
         if response.get("body", {}).get("is_success"):
             return response.get("body", {}).get("data", {}).get("users", [])
         else:
-            print(f"Failed to find peers: {response.get('body',{}).get('message')}")
+            print(
+                f"Failed to find peers: {response.get('body',{}).get('message')}")
             return []
 
     @requires_signin
     def create_chatroom(self, chatroom_key):
         response = self.client_tcp_thread.create_chatroom(chatroom_key)
         if response.get("body", {}).get("is_success"):
-            print(green_text("Chatroom created successfully"))
+            print(colorize("Chat room created successfully", "green"))
         else:
             print(
-                red_text(
-                    f"Chat room creation failed. {response.get('body',{}).get('message')}"
+                colorize(
+                    f"Chat room creation failed. {response.get('body',{}).get('message')}", "red"
                 )
             )
-            return None
 
     @requires_signin
     def get_chatrooms(self) -> list:
@@ -366,7 +343,8 @@ class ClientAuth:
                 )
                 return
         # user is new, update local table
-        self.current_chatroom_peers = self._get_chatroom_table(self.current_chatroom)
+        self.current_chatroom_peers = self._get_chatroom_table(
+            self.current_chatroom)
 
     @requires_signin
     def _get_chatroom_table(self, chatroom_key):
@@ -383,8 +361,8 @@ class ClientAuth:
             ]
         else:
             print(
-                red_text(
-                    f"Chat room entry failed. {response.get('body',{}).get('message')}"
+                colorize(
+                    f"Chat room entry failed. {response.get('body',{}).get('message')}", "red"
                 )
             )
             return None
@@ -410,10 +388,11 @@ class PeerClient:
         return chat room key if successful, else
         """
         if not (self.connect(recepient)):
-            print(red_text("could not connect to user"))
+            print(colorize("could not connect to user", "red"))
             return None
         self.transceiver.send_message(
-            S4P_Request.privrm_request(self.client_auth_instance.user, recepient)
+            S4P_Request.privrm_request(
+                self.client_auth_instance.user, recepient)
         )
         response = self.transceiver.recieve_message()
         return PeerClient.process_response(response)
@@ -430,14 +409,15 @@ class PeerClient:
             peer_left.clear()
             is_in_chat.set()
             print_and_remember(
-                green_text(f"Chat started with {recipient.get('username')}"),
-                magenta_text("write exit_ to exit"),
+                colorize(
+                    f"Chat started with {recipient.get('username')}", "green"),
+                colorize("write exit_ to exit", "magenta"),
             )
             while not not_chatting.is_set():  # I know...
                 if not ignore_input.is_set():
                     if not (self.connect(recipient)):
                         # won't work if outside the loop
-                        print(red_text("could not connect to user"))
+                        print(colorize("could not connect to user", "red"))
                         return None
                     message = input(me_prompt_text)
                     if ignore_input.is_set():
@@ -453,18 +433,19 @@ class PeerClient:
                     )
                     if message == "exit_":
                         is_in_chat.clear()
-                        print(green_text(f"You left the conversation."))
+                        print(colorize(f"You left the conversation.", "green"))
                         break
                     print_and_remember(
-                        green_text(f"{self.client_auth_instance.user['username']} >> ")
+                        colorize(
+                            f"{self.client_auth_instance.user['username']} >> ", "green")
                         + message
                     )
         finally:
             not_chatting.set()
             peer_left.set()
             print(
-                magenta_text(
-                    f"Chat ended with {recipient.get('username')}  Press enter to continue."
+                colorize(
+                    f"Chat ended with {recipient.get('username')}  Press enter to continue.", "magenta"
                 )
             )
 
@@ -472,25 +453,26 @@ class PeerClient:
         print_and_remember("?")
         while not not_chatting.is_set():
             active_usersnames = [
-                green_text(i.get("username"))
+                colorize(i.get("username"), "green")
                 for i in self.client_auth_instance.current_chatroom_peers
                 if i.get("is_active")
             ]
             offline_usersnames = [
-                red_text(i.get("username"))
+                colorize(i.get("username"), "red")
                 for i in self.client_auth_instance.current_chatroom_peers
                 if not i.get("is_active")
             ]
             print_in_constant_place(
                 tabulate(
-                    [[", ".join(active_usersnames), ", ".join(offline_usersnames)]],
+                    [[", ".join(active_usersnames),
+                      ", ".join(offline_usersnames)]],
                     headers=["ACTIVE USERS", "OFFLINE USERS"],
                     tablefmt="pretty",
                 ),
                 key="peers status",
                 ending_line="you >> ",
             )
-            time.sleep(5)
+            sleep(5)
 
     def chatroom_chat(self):
         """
@@ -501,7 +483,7 @@ class PeerClient:
         chatroom: array of dicts of room JOIN members
         """
         # user started chatting, used to pause the cli loop
-        print_and_remember(magenta_text(f"Chatroom started."))
+        print_and_remember(colorize(f"Chatroom started.", "magenta"))
         refresh_table = threading.Thread(target=self._refresh_uses_table)
 
         udp_transceiver = UDPRequestTransceiver()
@@ -515,8 +497,8 @@ class PeerClient:
             peer_left.clear()
             is_in_chat.set()
             refresh_table.start()
-            popped_in_message = blue_text(
-                f"{self.client_auth_instance.user['username']} just popped in !"
+            popped_in_message = colorize(
+                f"{self.client_auth_instance.user['username']} just popped in !", "blue"
             )
             for member in self.client_auth_instance.current_chatroom_peers:
                 udp_transceiver.send_message(
@@ -529,7 +511,8 @@ class PeerClient:
                 )
 
             print_and_remember(
-                green_text(f"Chatroom started"), magenta_text("write exit_ to exit")
+                colorize(f"Chatroom started", "green"), colorize(
+                    "write exit_ to exit", "magenta")
             )
             while not not_chatting.is_set():  # I know...
                 if not ignore_input.is_set():
@@ -552,10 +535,11 @@ class PeerClient:
 
                     if message == "exit_":
                         is_in_chat.clear()
-                        print(green_text(f"You left the conversation."))
+                        print(colorize(f"You left the conversation."), "green")
                         break
                     print_and_remember(
-                        green_text(f"{self.client_auth_instance.user['username']} >> ")
+                        colorize(
+                            f"{self.client_auth_instance.user['username']} >> ", "green")
                         + message
                     )
         finally:
@@ -564,23 +548,25 @@ class PeerClient:
             self.client_auth_instance.current_chatroom = None
             self.client_auth_instance.current_chatroom_peers = None
             print(
-                magenta_text(
-                    f"Chat ended with room {self.client_auth_instance.current_chatroom}  Press enter to continue."
+                colorize(
+                    f"Chat ended with room {self.client_auth_instance.current_chatroom}  Press enter to continue.", "magenta"
                 )
             )
 
     def enter_chatroom(self, chatroom_key):
         if self.client_auth_instance.current_chatroom:
             print(
-                red_text(
-                    f"you are already in a chatroom {self.client_auth_instance.current_chatroom}"
+                colorize(
+                    f"you are already in a chatroom {self.client_auth_instance.current_chatroom}", "red"
                 )
             )
             return
-        other_members = self.client_auth_instance._get_chatroom_table(chatroom_key)
+        other_members = self.client_auth_instance._get_chatroom_table(
+            chatroom_key)
         if other_members is None:
             print(
-                red_text(f"could not enter chatroom, make sure you are a member first")
+                colorize(
+                    f"could not enter chatroom, make sure you are a member first", "red")
             )
             return
         self.client_auth_instance.current_chatroom = chatroom_key
@@ -591,7 +577,8 @@ class PeerClient:
         try:
             # before connecting to someone, make sure to close any previous connection
             self.disconnect()
-            self.peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.peer_socket = socket.socket(
+                socket.AF_INET, socket.SOCK_STREAM)
             self.peer_socket.connect((user["IP"], user["PORT"]))
             self.transceiver.connection = self.peer_socket
             return True
@@ -622,10 +609,10 @@ class PeerClient:
         chatroom: chat room entry dict {_id,key,owner,IP,PORT}, where IP and PORT are the owner's ip and port
         """
         if not validate_request(chatroom, ["key", "owner", "IP", "PORT"]):
-            print(red_text(f"invalid chatroom entry, {chatroom}"))
+            print(colorize(f"invalid chatroom entry, {chatroom}", "red"))
             return None
         if not (self.connect(chatroom)):
-            print(red_text("could not connect to owner"))
+            print(colorize("could not connect to owner", "red"))
             return None
 
         self.transceiver.send_message(
@@ -637,11 +624,11 @@ class PeerClient:
     @staticmethod
     def process_response(response):
         if not response:
-            print(red_text("empty response"))
+            print(colorize("empty response", "red"))
             return None
         message = response.get("body", {}).get("message", None)
         if not response or not response.get("body", {}).get("is_success"):
-            print(red_text(message if message else "request succeeeded"))
+            print(colorize(message if message else "request succeeeded", "red"))
         else:
-            print(green_text(message if message else "request failed"))
+            print(colorize(message if message else "request failed", "green"))
         return response
