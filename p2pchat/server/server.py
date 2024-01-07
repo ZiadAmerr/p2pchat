@@ -19,7 +19,6 @@ from p2pchat.server.server_db import myDB as DB
 from p2pchat.server.authentication_manager import AuthenticationManager
 
 
-
 class SockerManager:
     def __init__(self, address, port):
         self.address = address
@@ -59,7 +58,7 @@ class UDPManager(SockerManager):
                 f"error while setting last seen for {request.get('body').get('username')}: {e}"
             )
             return None
-    
+
     def deactivate(self):
         self.server_socket.close()
         logging.info(f"UDP server thread stopped at port {self.port}")
@@ -108,13 +107,17 @@ class TCPManager(SockerManager):
         except Exception as e:
             print("Exception Occued: ", traceback.print_exc(e))
             return None
-    
+
     def deactivate(self):
         self.server_socket.close()
         logging.info(f"TCP server thread stopped at port {self.port}")
 
 
-def terminate(clients_montior: UsersMonitor, sockets_managers: List[Union[TCPManager, UDPManager]], recurse_limit=4):
+def terminate(
+    clients_montior: UsersMonitor,
+    sockets_managers: List[Union[TCPManager, UDPManager]],
+    recurse_limit=4,
+):
     if recurse_limit < 0:
         return
 
@@ -124,7 +127,7 @@ def terminate(clients_montior: UsersMonitor, sockets_managers: List[Union[TCPMan
             manager.deactivate()
         sys.exit(0)
     except KeyboardInterrupt:
-        terminate(recurse_limit=recurse_limit-1)
+        terminate(recurse_limit=recurse_limit - 1)
 
 
 if __name__ == "__main__":
@@ -132,18 +135,23 @@ if __name__ == "__main__":
     server_tcp_manager = TCPManager("127.0.0.1", port_tcp)
     clients_montior = UsersMonitor()
     clients_montior.start()
-    
-    sockets_managers: List[Union[TCPManager, UDPManager]] = [server_tcp_manager, server_udp_manager]
-    
+
+    sockets_managers: List[Union[TCPManager, UDPManager]] = [
+        server_tcp_manager,
+        server_udp_manager,
+    ]
+
     managers_socks = {}
     for manager in sockets_managers:
         manager.start_socket()
         managers_socks[manager] = manager.server_socket
-    
-    socket_to_manager: Dict[socket.socket, Union[TCPManager, UDPManager]] = {v: k for k, v in managers_socks.items()}
+
+    socket_to_manager: Dict[socket.socket, Union[TCPManager, UDPManager]] = {
+        v: k for k, v in managers_socks.items()
+    }
 
     socks = list(managers_socks.values())
-    
+
     try:
         while socks:
             readable, _, _ = select.select(socks, [], [])
@@ -152,6 +160,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print(colorize("KeyboardInterrupt - terminating...", "red"))
         terminate(clients_montior, sockets_managers)
-
-    
-    

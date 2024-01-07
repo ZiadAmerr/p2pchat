@@ -47,10 +47,13 @@ def show_profile(username, id, communicated_with):
 
 def print_menu(choice):
     if choice == "chatroom_menu":
-        print(f"""
+        print(
+            f"""
 {colorize('Create a chatroom', 'yellow')}
 
-{colorize('Enter chatroom name to create: ', 'green')}""", end="")
+{colorize('Enter chatroom name to create: ', 'green')}""",
+            end="",
+        )
 
 
 class App:
@@ -66,18 +69,21 @@ class App:
         clear_console()
         print(colorize(colorize("Welcome to Our chat", "underline"), "magenta"))
         print()
-        has_account = input(f"Do you have an account? ({colorize('y', 'green')}/{colorize('n', 'red')}): ")
+        has_account = input(
+            f"Do you have an account? ({colorize('y', 'green')}/{colorize('n', 'red')}): "
+        )
 
         while has_account not in ["y", "n"]:
             clear_console()
-            print(colorize("Please enter a valid response, as", "yellow"), colorize(f"{has_account}", "red"), colorize("is not a valid response", "yellow"))
+            print(
+                colorize("Please enter a valid response, as", "yellow"),
+                colorize(f"{has_account}", "red"),
+                colorize("is not a valid response", "yellow"),
+            )
             has_account = input("Do you have an account? (y/n): ")
-        
+
         if has_account in ["y", "n"]:
-            return {
-                "y": "Login",
-                "n": "Sign Up"
-            }[has_account]
+            return {"y": "Login", "n": "Sign Up"}[has_account]
 
     def login_state(self):
         if self.client_auth.user is not None:
@@ -97,14 +103,17 @@ class App:
             print(colorize("Incorrect username or password", "red"))
             print()
 
-
         if self.incorrect_attempt["incorrect_attempt"] > 0:
-            print(colorize("Type ", "magenta") + colorize("!exit", "red") + colorize(" if you want to go back to the previous menu", "magenta"))
+            print(
+                colorize("Type ", "magenta")
+                + colorize("!exit", "red")
+                + colorize(" if you want to go back to the previous menu", "magenta")
+            )
         username = input("Username: ")
 
         if username == "!exit":
             return "Welcome"
-        
+
         password = pwinput("Password: ")
 
         response = self.client_auth.login(
@@ -130,8 +139,11 @@ class App:
     def signup_state(self):
         print(colorize("Create an account!", "yellow"))
 
-        print(colorize(
-            "Type '!exit' if you want to go back to the previous menu", "magenta"))
+        print(
+            colorize(
+                "Type '!exit' if you want to go back to the previous menu", "magenta"
+            )
+        )
         username = input("Username: ")
         if username == "!exit":
             return "Welcome"
@@ -150,7 +162,12 @@ class App:
             print(response.get("body", {}).get("message"))
             return "Sign Up"
 
-        print(colorize(f"Account created successfully! You will be redirected in {IDLE_WAIT} seconds.", "green"))
+        print(
+            colorize(
+                f"Account created successfully! You will be redirected in {IDLE_WAIT} seconds.",
+                "green",
+            )
+        )
 
         return "Welcome"
 
@@ -169,7 +186,7 @@ class App:
         elif choice == "5":
             return "list users"
         elif choice == "6":
-            return "Send a private message"
+            return "send msg"
         elif choice == "7":
             return "exit"
         else:
@@ -179,8 +196,11 @@ class App:
         print("Your Profile")
 
         if "username" in self.state_data["user"]:
-            show_profile(self.state_data['user']['username'], self.state_data['user']['id'], self.state_data["user"].get(
-        "communicated_with", set()))
+            show_profile(
+                self.state_data["user"]["username"],
+                self.state_data["user"]["id"],
+                self.state_data["user"].get("communicated_with", set()),
+            )
         else:
             print("Username not found.")
             if self.state_data["users"]:
@@ -209,7 +229,9 @@ class App:
         print("List available rooms")
         self.client_auth.available_rooms = self.client_auth.get_chatrooms()
         if len(self.client_auth.available_rooms):
-            headers = [colorize(i, "bold") for i in ["ROOM KEY", "OWNER", "OWNER STATUS"]]
+            headers = [
+                colorize(i, "bold") for i in ["ROOM KEY", "OWNER", "OWNER STATUS"]
+            ]
             data = []
             for room in self.client_auth.available_rooms:
                 status = (

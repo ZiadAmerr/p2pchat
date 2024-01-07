@@ -47,6 +47,6 @@ def exception_wrapper(func):
             return result
         except Exception as e:
             print(f"An exception occurred: {e}")
-            return None 
+            return None
 
     return wrapper

@@ -279,9 +279,7 @@ class AdmitUserRequestHandler(RequestHandler):
 class GetRoomMembersRequestHandler(RequestHandler):
     @staticmethod
     def handle_request(connection_address, request):
-        if not validate_request(
-            request.get("body", {}), ["caller", "chatroom_key"]
-        ):
+        if not validate_request(request.get("body", {}), ["caller", "chatroom_key"]):
             print(request)
             raise ValueError(
                 "Invalid Request, requires caller, chatroom_key and user to be registered"

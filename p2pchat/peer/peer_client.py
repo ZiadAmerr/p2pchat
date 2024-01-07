@@ -13,7 +13,11 @@ from p2pchat.protocols.tcp_request_transceiver import (
 from p2pchat.protocols.suap import SUAP_Request
 from p2pchat.protocols.s4p import S4P_Request
 from p2pchat.utils.colors import colorize
-from p2pchat.utils.chat_history import print_and_remember, print_in_constant_place, history
+from p2pchat.utils.chat_history import (
+    print_and_remember,
+    print_in_constant_place,
+    history,
+)
 from p2pchat.data import port_tcp, port_udp
 import logging
 
@@ -84,14 +88,12 @@ class ClientTCPThread:
 
     def connect(self):
         try:
-            self.client_socket = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM)
+            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect((self.server_address, self.server_port))
             self.transceiver.connection = self.client_socket
             return True
         except ConnectionRefusedError:
-            app_logger.warning(
-                "Connection refused. Server may not be available.")
+            app_logger.warning("Connection refused. Server may not be available.")
         except TimeoutError:
             app_logger.warning("Connection attempt timed out.")
         except OSError as e:
@@ -120,8 +122,7 @@ class ClientTCPThread:
                 "header": "",
                 "body": {"is_success": False, "message": "Connection failed"},
             }
-        self.transceiver.send_message(
-            SUAP_Request.rgst_request(username, password))
+        self.transceiver.send_message(SUAP_Request.rgst_request(username, password))
         response = self.transceiver.recieve_message()
         self.client_socket.close()
         return response
@@ -175,8 +176,7 @@ class ClientTCPThread:
                 "header": "",
                 "body": {"is_success": False, "message": "Connection failed"},
             }
-        self.transceiver.send_message(
-            {"type": "LISTRM", "user": self.client_auth.user})
+        self.transceiver.send_message({"type": "LISTRM", "user": self.client_auth.user})
         response = self.transceiver.recieve_message()
         self.client_socket.close()
         return response
@@ -219,7 +219,10 @@ def requires_signin(func):
             return func(self, *args, **kwargs)
         else:
             print(
-                colorize(f"Operation Reqires user to be logged in,{self.to_dict()}", "red"))
+                colorize(
+                    f"Operation Reqires user to be logged in,{self.to_dict()}", "red"
+                )
+            )
             return {
                 "header": "",
                 "body": {"is_success": False, "message": "User not logged in"},
@@ -244,8 +247,7 @@ class ClientAuth:
             self.available_rooms = []  # all chatrooms, updated by a thread
             self.current_chatroom = None
             self.current_chatroom_peers = None
-            self.client_tcp_thread = ClientTCPThread(
-                "127.0.0.1", port_tcp)
+            self.client_tcp_thread = ClientTCPThread("127.0.0.1", port_tcp)
             self.keep_alive_thread = KeepAliveThread(
                 "127.0.0.1", port_udp, user=self.user
             )
@@ -256,8 +258,7 @@ class ClientAuth:
         if request is successful, keep alive thread is started, user is returnred in client.user object.
         response dictionary is returnred as well
         """
-        response = self.client_tcp_thread.login(
-            username, password, tcp_port, udp_port)
+        response = self.client_tcp_thread.login(username, password, tcp_port, udp_port)
         if response.get("body", {}).get("is_success"):
             self.user = response.get("body").get("data")
             self.keep_alive_thread.user = self.user
@@ -296,8 +297,7 @@ class ClientAuth:
         if response.get("body", {}).get("is_success"):
             return response.get("body", {}).get("data", {}).get("users", [])
         else:
-            print(
-                f"Failed to find peers: {response.get('body',{}).get('message')}")
+            print(f"Failed to find peers: {response.get('body',{}).get('message')}")
             return []
 
     @requires_signin
@@ -308,7 +308,8 @@ class ClientAuth:
         else:
             print(
                 colorize(
-                    f"Chat room creation failed. {response.get('body',{}).get('message')}", "red"
+                    f"Chat room creation failed. {response.get('body',{}).get('message')}",
+                    "red",
                 )
             )
 
@@ -343,8 +344,7 @@ class ClientAuth:
                 )
                 return
         # user is new, update local table
-        self.current_chatroom_peers = self._get_chatroom_table(
-            self.current_chatroom)
+        self.current_chatroom_peers = self._get_chatroom_table(self.current_chatroom)
 
     @requires_signin
     def _get_chatroom_table(self, chatroom_key):
@@ -362,7 +362,8 @@ class ClientAuth:
         else:
             print(
                 colorize(
-                    f"Chat room entry failed. {response.get('body',{}).get('message')}", "red"
+                    f"Chat room entry failed. {response.get('body',{}).get('message')}",
+                    "red",
                 )
             )
             return None
@@ -391,8 +392,7 @@ class PeerClient:
             print(colorize("could not connect to user", "red"))
             return None
         self.transceiver.send_message(
-            S4P_Request.privrm_request(
-                self.client_auth_instance.user, recepient)
+            S4P_Request.privrm_request(self.client_auth_instance.user, recepient)
         )
         response = self.transceiver.recieve_message()
         return PeerClient.process_response(response)
@@ -409,8 +409,7 @@ class PeerClient:
             peer_left.clear()
             is_in_chat.set()
             print_and_remember(
-                colorize(
-                    f"Chat started with {recipient.get('username')}", "green"),
+                colorize(f"Chat started with {recipient.get('username')}", "green"),
                 colorize("write exit_ to exit", "magenta"),
             )
             while not not_chatting.is_set():  # I know...
@@ -433,11 +432,13 @@ class PeerClient:
                     )
                     if message == "exit_":
                         is_in_chat.clear()
+                        history.reset_history()
                         print(colorize(f"You left the conversation.", "green"))
                         break
                     print_and_remember(
                         colorize(
-                            f"{self.client_auth_instance.user['username']} >> ", "green")
+                            f"{self.client_auth_instance.user['username']} >> ", "green"
+                        )
                         + message
                     )
         finally:
@@ -445,7 +446,8 @@ class PeerClient:
             peer_left.set()
             print(
                 colorize(
-                    f"Chat ended with {recipient.get('username')}  Press enter to continue.", "magenta"
+                    f"Chat ended with {recipient.get('username')}  Press enter to continue.",
+                    "magenta",
                 )
             )
 
@@ -464,8 +466,7 @@ class PeerClient:
             ]
             print_in_constant_place(
                 tabulate(
-                    [[", ".join(active_usersnames),
-                      ", ".join(offline_usersnames)]],
+                    [[", ".join(active_usersnames), ", ".join(offline_usersnames)]],
                     headers=["ACTIVE USERS", "OFFLINE USERS"],
                     tablefmt="pretty",
                 ),
@@ -511,8 +512,8 @@ class PeerClient:
                 )
 
             print_and_remember(
-                colorize(f"Chatroom started", "green"), colorize(
-                    "write exit_ to exit", "magenta")
+                colorize(f"Chatroom started", "green"),
+                colorize("write exit_ to exit", "magenta"),
             )
             while not not_chatting.is_set():  # I know...
                 if not ignore_input.is_set():
@@ -539,7 +540,8 @@ class PeerClient:
                         break
                     print_and_remember(
                         colorize(
-                            f"{self.client_auth_instance.user['username']} >> ", "green")
+                            f"{self.client_auth_instance.user['username']} >> ", "green"
+                        )
                         + message
                     )
         finally:
@@ -549,7 +551,8 @@ class PeerClient:
             self.client_auth_instance.current_chatroom_peers = None
             print(
                 colorize(
-                    f"Chat ended with room {self.client_auth_instance.current_chatroom}  Press enter to continue.", "magenta"
+                    f"Chat ended with room {self.client_auth_instance.current_chatroom}  Press enter to continue.",
+                    "magenta",
                 )
             )
 
@@ -557,16 +560,17 @@ class PeerClient:
         if self.client_auth_instance.current_chatroom:
             print(
                 colorize(
-                    f"you are already in a chatroom {self.client_auth_instance.current_chatroom}", "red"
+                    f"you are already in a chatroom {self.client_auth_instance.current_chatroom}",
+                    "red",
                 )
             )
             return
-        other_members = self.client_auth_instance._get_chatroom_table(
-            chatroom_key)
+        other_members = self.client_auth_instance._get_chatroom_table(chatroom_key)
         if other_members is None:
             print(
                 colorize(
-                    f"could not enter chatroom, make sure you are a member first", "red")
+                    f"could not enter chatroom, make sure you are a member first", "red"
+                )
             )
             return
         self.client_auth_instance.current_chatroom = chatroom_key
@@ -577,8 +581,7 @@ class PeerClient:
         try:
             # before connecting to someone, make sure to close any previous connection
             self.disconnect()
-            self.peer_socket = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM)
+            self.peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.peer_socket.connect((user["IP"], user["PORT"]))
             self.transceiver.connection = self.peer_socket
             return True

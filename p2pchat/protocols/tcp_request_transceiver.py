@@ -5,6 +5,7 @@ import socket
 from p2pchat.utils.colors import colorize
 from p2pchat.data import header_size, max_udp_packet_size
 
+
 class RequestTransceiver:
     header_size = header_size
     max_udp_packet_size = max_udp_packet_size
@@ -85,7 +86,7 @@ class TCPRequestTransceiver(RequestTransceiver):
     @staticmethod
     def _add_header(message: bytes) -> bytes:
         """Add header to the message
-        
+
         Args:
             message (bytes): message to be sent
         """
@@ -115,7 +116,7 @@ class UDPRequestTransceiver(RequestTransceiver):
 
     def recieve_message(self) -> dict:
         """Recieve message from the receiving socket
-        
+
         Returns:
             dict: message recieved
         """
@@ -134,7 +135,7 @@ class UDPRequestTransceiver(RequestTransceiver):
 
         Args:
             message (dict): message to be sent
-        
+
         Returns:
             dict: message with header
         """
@@ -147,7 +148,7 @@ class UDPRequestTransceiver(RequestTransceiver):
 
     def send_message(self, message: dict, dest):
         """Send message to destination
-        
+
         Args:
             message (dict): message to be sent
             dest (tuple): destination address
@@ -157,7 +158,8 @@ class UDPRequestTransceiver(RequestTransceiver):
         if len(message_in_bytes) > RequestTransceiver.max_udp_packet_size:
             print(
                 colorize(
-                    f"Message too large to send over UDP,Max allowed size {RequestTransceiver.max_udp_packet_size}, message size {len(message_in_bytes)}", "red"
+                    f"Message too large to send over UDP,Max allowed size {RequestTransceiver.max_udp_packet_size}, message size {len(message_in_bytes)}",
+                    "red",
                 )
             )
         self.sender_socket.sendto(message_in_bytes, dest)

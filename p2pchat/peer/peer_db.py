@@ -7,7 +7,7 @@ from p2pchat.utils.utils import dict_factory
 
 class ServerDB:
     """Server Database
-    
+
     This class is used to interact with the server database"""
 
     def __init__(self):

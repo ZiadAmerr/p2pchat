@@ -41,7 +41,6 @@ def print_in_constant_place(*args, key=None, ending_line=None):
 def print_volatile_message(*args, ending_line=None):
     text = " ".join([str(arg) for arg in args])
     history.append((text, "volatile"))
-    clear_console()
     history.print_chat(ending_line)
 
 
@@ -56,6 +55,7 @@ class History:
         self.history = []
 
     def print_chat(self, ending_line=None):
+        clear_console()
         for msg in self.history:
             print(msg if isinstance(msg, str) else msg[0])
         if ending_line:
@@ -65,6 +65,7 @@ class History:
         self.history = [
             msg for msg in self.history if isinstance(msg, str) or msg[1] != "volatile"
         ]
+        self.print_chat()
 
 
 history = History()

@@ -27,7 +27,7 @@ class UsersMonitor(threading.Thread):
 
     def stop_monitoring(self):
         self.keep_monitoring = False
-    
+
     def deactivate(self):
         self.stop_monitoring()
         self.join()

@@ -11,19 +11,17 @@ STYLES = {
 }
 
 
-def colorize(text, style: str=None):
+def colorize(text, style: str = None):
     if style is not None:
         if style in STYLES.keys():
             start = STYLES[style]
             end = STYLES["end"]
 
             return f"{start}{text}{end}"
-        
-        raise ValueError(
-            f"Invalid style: {style}, choose from {STYLES.keys()}")
-    
+
+        raise ValueError(f"Invalid style: {style}, choose from {STYLES.keys()}")
+
     return text
-         
 
 
 # Usage
