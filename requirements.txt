@@ -4,3 +4,4 @@ bcrypt
 tabulate
 pwinput
 matplotlib
+psutil

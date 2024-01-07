@@ -10,23 +10,27 @@ A modular peer-to-peer chat system implemented in Python. Connect with others se
 ## Installation
 
 To install p2pchat:
-1. Clone the repository using:
 ```bash
-# clone the repo, use --depth 1 if you just want to build from source and not develop
-git clone https://github.com/ZiadAmerr/p2pchat
+# clone the repository
+git clone https://github.com/ZiadAmerr/p2pchat --depth=1
 
 # navigate to it
 cd p2pchat
 
 # install it
-pip install .
+python -m pip install -q .
 ```
 
 ## Usage
 
-1. Lorem
-2. Ipsum
-3. ....
+To start using p2pchat app:
+```bash
+# run the server
+python p2pchat/server/server.py
+
+# run the app
+python p2pchat/cli.py
+```
 
 ## Contributing
 
