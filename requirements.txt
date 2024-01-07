@@ -1,7 +1,6 @@
-pymongo
-black
 netifaces
 setuptools_rust
 bcrypt
 tabulate
 pwinput
+matplotlib

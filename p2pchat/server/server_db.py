@@ -173,7 +173,7 @@ class ServerDB:
         sets a user status to active and updates their ip
         """
         res = self.connection_pool.execute(
-            f"UPDATE users SET is_active = 1, IP = ?,PORT = ?, last_seen = {get_timesamp()}, PORT_UDP = ? WHERE username = ?;",
+            f"UPDATE users SET is_active = 1, IP = ?, PORT = ?, last_seen = {get_timesamp()}, PORT_UDP = ? WHERE username = ?;",
             (ip, port, udp_port, username),
             return_type=EXECUTE,
         )
@@ -186,14 +186,14 @@ class ServerDB:
         """
 
         self.connection_pool.execute(
-            f"UPDATE users SET is_active = 0 WHERE username = ?;",
+            "UPDATE users SET is_active = 0, last_seen = 0 WHERE username = ?;",
             (username,),
         )
 
     @exception_wrapper
     def register_user(self, username, password):
         self.connection_pool.execute(
-            "INSERT INTO users (_id,username, password, created_at) VALUES (?,?, ?, ?);",
+            "INSERT INTO users (_id,username, password, created_at) VALUES (?, ?, ?, ?);",
             (get_unique_id(), username, password, get_timesamp()),
         )
 

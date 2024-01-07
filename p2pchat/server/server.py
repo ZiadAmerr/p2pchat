@@ -6,7 +6,10 @@ import pickle
 import select
 import logging
 import sys
+from time import sleep
 from typing import List, Union, Dict
+from psutil import process_iter
+from signal import SIGTERM
 
 from p2pchat.server.monitor import UsersMonitor
 from p2pchat.protocols.tcp_request_transceiver import TCPRequestTransceiver
@@ -14,7 +17,6 @@ from p2pchat.protocols.suap import SUAP_Response
 from p2pchat.utils.utils import validate_request
 from p2pchat.utils.colors import colorize
 from p2pchat.data import port_tcp, port_udp
-
 from p2pchat.server.server_db import myDB as DB
 from p2pchat.server.authentication_manager import AuthenticationManager
 
@@ -71,7 +73,22 @@ class TCPManager(SockerManager):
 
     def start_socket(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.address, self.port))
+        try:
+            self.server_socket.bind((self.address, self.port))
+        except OSError:
+            for proc in process_iter():
+                for conns in proc.connections(kind="inet"):
+                    if conns.laddr.port == self.port:
+                        proc.send_signal(SIGTERM)
+            sleep(3)
+            try:
+                self.server_socket.bind((self.address, self.port))
+            except OSError:
+                logging.error(
+                    f"TCP server thread failed to start at port {self.port} due to OSError"
+                )
+                return None
+
         self.server_socket.listen(1000)
         logging.info(f"TCP server thread started at port {self.port}")
 

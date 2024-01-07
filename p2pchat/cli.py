@@ -12,13 +12,13 @@ from p2pchat.utils.colors import colorize
 from p2pchat.utils.chat_history import history, print_and_remember, clear_console
 from p2pchat.globals import not_chatting, ignore_input
 
-# logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 IDLE_WAIT = 1  # change to 3 for slower changing between screens
 
 
 MAIN_MENU_TEXT = f"""
-{colorize(f'{colorize("Welcome to Our chat", "magenta")} - {colorize("Main Menu", "yellow")}', 'underline')}
+{colorize(f'{colorize("Welcome to Our chat", "bold")} - {colorize("Main Menu", "bold")}', 'underline')}
 
 Choices:
     {colorize('1', 'green')}. Create room
@@ -62,8 +62,8 @@ class App:
         self.incorrect_attempt = {"incorrect_attempt": 0}
         self.active_peers = []
         self.client_auth.available_rooms = []
-        self.peer_server = PeerServer()
-        self.peer_client = PeerClient()
+        self.peer_server = None
+        self.peer_client = None
 
     def welcome_state(self):
         clear_console()
@@ -115,6 +115,9 @@ class App:
             return "Welcome"
 
         password = pwinput("Password: ")
+
+        self.peer_server = PeerServer()
+        self.peer_client = PeerClient()
 
         response = self.client_auth.login(
             username,
@@ -220,13 +223,15 @@ class App:
         return "Main Menu"
 
     def create_chatroom_state(self):
-        print_menu("chatroom_intro")
+        print_menu("chatroom_menu")
         room_name = input()
         self.client_auth.create_chatroom(room_name)
         return "Main Menu"
 
     def list_rooms_state(self):
-        print("List available rooms")
+        clear_console()
+        print(colorize("List of available rooms", "yellow"), end="\n\n")
+
         self.client_auth.available_rooms = self.client_auth.get_chatrooms()
         if len(self.client_auth.available_rooms):
             headers = [
@@ -246,6 +251,7 @@ class App:
         else:
             print("No rooms available.")
 
+        input(colorize("\n\nPress enter to go back to the main menu.", "yellow"))
         return "Main Menu"
 
     def send_msg_state(self):
@@ -271,7 +277,7 @@ class App:
             key = response.get("body").get("data").get("key")
 
             self.peer_server.setup_chat(key)
-            print_and_remember(colorize("you are the client", "blue"))
+            # print_and_remember(colorize("you are the client", "blue"))
             self.peer_client.chat(self.client_auth.user, user, key)
             self.peer_server.end_chat()
         else:
@@ -319,19 +325,24 @@ class App:
         return "Main Menu"
 
     def list_state(self):
+        clear_console()
         online_users = self.client_auth.get_online_peers()
-        print("Online Users:")
+        print(colorize("List of online users", "yellow"))
+
         if len(online_users):
             self.active_peers = online_users
             for user in online_users:
                 print(f"- {user['username']}")
         else:
             print("No users are currently online.")
-        print()
+
+        input(colorize("\n\nPress enter to go back to the main menu.", "yellow"))
         return "Main Menu"
 
     def exit_state(self):
         self.client_auth.logout()
+        self.peer_server.stop()
+
         print("Goodbye!")
         return "Welcome"
 
@@ -372,7 +383,9 @@ class App:
                     next_state = "Login"
 
             sleep(IDLE_WAIT)
-            clear_console()
+            if not ignore_input.is_set():
+                pass
+                clear_console()
             state = next_state
 
 

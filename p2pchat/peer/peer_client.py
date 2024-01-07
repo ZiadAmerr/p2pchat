@@ -5,6 +5,7 @@ import socket
 import pickle
 from time import sleep
 from tabulate import tabulate
+from typing import Union
 
 from p2pchat.protocols.tcp_request_transceiver import (
     TCPRequestTransceiver,
@@ -248,9 +249,7 @@ class ClientAuth:
             self.current_chatroom = None
             self.current_chatroom_peers = None
             self.client_tcp_thread = ClientTCPThread("127.0.0.1", port_tcp)
-            self.keep_alive_thread = KeepAliveThread(
-                "127.0.0.1", port_udp, user=self.user
-            )
+            self.keep_alive_thread = None
 
     def login(self, username: str, password: str, tcp_port: int, udp_port=None) -> dict:
         """
@@ -261,6 +260,9 @@ class ClientAuth:
         response = self.client_tcp_thread.login(username, password, tcp_port, udp_port)
         if response.get("body", {}).get("is_success"):
             self.user = response.get("body").get("data")
+            self.keep_alive_thread = KeepAliveThread(
+                "127.0.0.1", port_udp, user=self.user
+            )
             self.keep_alive_thread.user = self.user
             self.keep_alive_thread.start()
         else:
@@ -280,6 +282,7 @@ class ClientAuth:
         self.client_tcp_thread.logout(self.user.get("username"))
         self.keep_alive_thread.stop()
         self.user = None
+        self.keep_alive_thread.user = None
 
     def get_online_peers(self):
         """
@@ -330,7 +333,7 @@ class ClientAuth:
         return self.client_tcp_thread.admit_user_to_chatroom(user, chatroom_key)
 
     @requires_signin
-    def get_chatroom(self, chatroom_key) -> None | list:
+    def get_chatroom(self, chatroom_key) -> Union[None, list]:
         # get most recent chatroom members info
         return self.client_tcp_thread.get_chatroom(chatroom_key)
 

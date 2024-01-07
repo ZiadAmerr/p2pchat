@@ -58,7 +58,7 @@ class History:
         clear_console()
         for msg in self.history:
             print(msg if isinstance(msg, str) else msg[0])
-        if ending_line:
+        if ending_line is not None:
             print(ending_line, end="")
 
     def clear_volatile_messages(self):

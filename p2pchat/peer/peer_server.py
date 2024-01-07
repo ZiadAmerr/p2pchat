@@ -45,7 +45,7 @@ class PeerTCPManager(SockerManager):
                     if res.get("is_success"):
                         transciver.send_message(res)
                         client = PeerClient()
-                        print_and_remember(colorize("you are the server", "blue"))
+                        # print_and_remember(colorize("you are the server", "blue"))
                         self.chat_thread = threading.Thread(
                             target=client.chat,
                             args=(
@@ -253,10 +253,11 @@ class PeerServer(threading.Thread):
         super().__init__()
         self.tcp_manager = PeerTCPManager(address)
         self.udp_manager = PeerUDPManager(address)
-        self.peer_credentails = None
+        self.peer_credentials = None
         logging.info(f"peer tcp port: {self.tcp_manager.port}")
         logging.info(f"peer udp port: {self.udp_manager.port}")
-        self.work = False
+        self.work_event = threading.Event()
+        self.server_thread = None
 
     def set_user(self, user):
         self.tcp_manager.user = user
@@ -278,17 +279,33 @@ class PeerServer(threading.Thread):
 
     def run(self):
         logging.info(f"started listening at :{self.udp_manager.port}")
-        self.work = True
+        self.work_event.set()
         self._activate()
         socket_to_manager = {
             mngr.socket: mngr for mngr in [self.tcp_manager, self.udp_manager]
         }
+
+        self.server_thread = threading.current_thread()
+
         socks = list(socket_to_manager.keys())
-        while socks and self.work:
-            readable, _, _ = select.select(socks, [], [])
-            for s in readable:
-                threading.Thread(target=socket_to_manager[s].handle_request).start()
+        while socks and self.work_event.is_set():
+            try:
+                readable, _, _ = select.select(socks, [], [], 1)
+                for s in readable:
+                    threading.Thread(
+                        target=socket_to_manager[s].handle_request).start()
+            except OSError as e:
+                logging.error(f"Error in select operation: {e}")
+                break
 
     def stop(self):
-        self.work = False
+        # Wait for the server thread to finish
+        self.work_event.clear()
+
+        if self.server_thread:
+            self.server_thread.join()
+        
         self._deactivate()
+        for manager in [self.tcp_manager, self.udp_manager]:
+            if manager.socket:
+                manager.socket.close()
