@@ -292,8 +292,7 @@ class PeerServer(threading.Thread):
             try:
                 readable, _, _ = select.select(socks, [], [], 1)
                 for s in readable:
-                    threading.Thread(
-                        target=socket_to_manager[s].handle_request).start()
+                    threading.Thread(target=socket_to_manager[s].handle_request).start()
             except OSError as e:
                 logging.error(f"Error in select operation: {e}")
                 break
@@ -304,7 +303,7 @@ class PeerServer(threading.Thread):
 
         if self.server_thread:
             self.server_thread.join()
-        
+
         self._deactivate()
         for manager in [self.tcp_manager, self.udp_manager]:
             if manager.socket:
