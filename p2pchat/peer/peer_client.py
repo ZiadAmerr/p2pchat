@@ -634,7 +634,9 @@ class PeerClient:
             return None
         message = response.get("body", {}).get("message", None)
         if not response or not response.get("body", {}).get("is_success"):
-            print(colorize(message if message else "request succeeeded", "red"))
+            print(colorize(message if message else "request failed", "red"))
+            input(colorize("\n\nPress enter to go back to continue.", "yellow"))
         else:
-            print(colorize(message if message else "request failed", "green"))
+            print(colorize(message if message else "request succeeded", "green"))
+        
         return response

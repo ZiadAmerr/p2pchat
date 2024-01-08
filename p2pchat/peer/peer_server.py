@@ -70,6 +70,7 @@ class PeerTCPManager(SockerManager):
             return None
 
     def handle_new_chat_request(self, request):
+        sender = request.get("body").get("sender").get("username")
         if is_in_chat.is_set():
             print_volatile_message(colorize(f"{sender} tried to contact you", "blue"))
             threading.Timer(5, history.clear_volatile_messages).start()
@@ -78,7 +79,6 @@ class PeerTCPManager(SockerManager):
             return S4P_Response.INCRAUTH(
                 "Invalid Request, Enter chat must have username"
             )
-        sender = request.get("body").get("sender").get("username")
         print(f"Incoming request? Press enter to continue")
         ignore_input.set()
         not_chatting.clear()
